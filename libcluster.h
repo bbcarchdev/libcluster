@@ -30,13 +30,11 @@ typedef int (*CLUSTERBALANCE)(CLUSTER *cluster, CLUSTERSTATE *state);
  */
 struct cluster_state_struct
 {
-	/* The index of this member */
+	/* The index of the first worker in this cluster member */
 	int index;
-	/* The number of threads (or sub-instances) this member has */
-	int threads;
-	/* The total number of instances, including threads, across the
-	 * whole cluster.
-	 */
+	/* The number of workers this member has */
+	int workers;
+	/* The total number of workers across the whole cluster */
 	int total;
 };
 
@@ -55,14 +53,41 @@ int cluster_leave(CLUSTER *cluster);
 /* Set the cluster's verbose flag, which enables more debugging information */
 int cluster_set_verbose(CLUSTER *cluster, int verbose);
 
+/* Retrieve the key used by this cluster */
+/* MT-safety: safe provided barriered against cluster_destroy() */
+const char *cluster_key(CLUSTER *cluster);
+
+/* Retrieve the name of the environment used by this cluster */
+/* MT-safety: safe provided barriered against cluster_set_env() or
+ *            cluster_destroy()
+ */
+const char *cluster_env(CLUSTER *cluster);
+
 /* Set the name of the environment used by this cluster */
 int cluster_set_env(CLUSTER *cluster, const char *envname);
 
-/* Set the unique instance ID of this cluster member */
+/* Retrieve the identifier of this member */
+/* MT-safety: safe provided barriered against cluster_set_instance() or
+ *            cluster_destroy()
+ */
+const char *cluster_instance(CLUSTER *cluster);
+
+/* Set the unique member instance identifer of this cluster member */
 int cluster_set_instance(CLUSTER *cluster, const char *instid);
 
-/* Set the number of threads (or 'sub-instances') this cluster member has */
-int cluster_set_threads(CLUSTER *cluster, int nthreads);
+/* Get the index of a worker in this cluster member (not valid when not joined)
+ * The first worker is 0, the second is 1, ...
+ */
+int cluster_index(CLUSTER *cluster, int worker);
+
+/* Get the total worker count for this cluster (not valid when not joined) */
+int cluster_total(CLUSTER *cluster);
+
+/* Get the number of workers this cluster member has */
+int cluster_workers(CLUSTER *cluster);
+
+/* Set the number of worker this cluster member has */
+int cluster_set_workers(CLUSTER *cluster, int nworkers);
 
 /* Set the registry endpoint URI; NULL indicates this is a static cluster */
 int cluster_set_registry(CLUSTER *cluster, const char *uri);
@@ -80,7 +105,7 @@ int cluster_set_balancer(CLUSTER *cluster, CLUSTERBALANCE callback);
 /* Set the numeric index of this member (0..n) */
 int cluster_static_set_index(CLUSTER *cluster, int instindex);
 
-/* Set the total number of threads in the cluster */
+/* Set the total number of workers in the cluster */
 int cluster_static_set_total(CLUSTER *cluster, int total);
 
 #endif /*!LIBCLUSTER_H_*/

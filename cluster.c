@@ -159,6 +159,32 @@ cluster_set_verbose(CLUSTER *cluster, int verbose)
 	return 0;
 }
 
+/* Retrieve the key used by this cluster */
+/* MT-safety: safe provided barriered against cluster_destroy() */
+const char *
+cluster_key(CLUSTER *cluster)
+{
+	/* Note that we don't lock here: this call's effects, and its return
+	 * value, are undefined if not sufficiently protected against
+	 * cluster_destroy()
+	 */
+	return cluster->key;
+}
+
+/* Retrieve the name of the environment used by this cluster */
+/* MT-safety: safe provided barriered against cluster_set_env() or
+ *            cluster_destroy()
+ */
+const char *
+cluster_env(CLUSTER *cluster)
+{
+	/* Note that we don't lock here: this call's effects, and its return
+	 * value, are undefined if not sufficiently protected against
+	 * cluster_set_env() or cluster_destroy()
+	 */
+	return cluster->env;
+}
+
 /* Set the environment name for this cluster */
 int
 cluster_set_env(CLUSTER *cluster, const char *env)
@@ -194,7 +220,21 @@ cluster_set_env(CLUSTER *cluster, const char *env)
 	return 0;
 }
 
-/* Set the instance name for this cluster */
+/* Retrieve the identifier of this instance */
+/* MT-safety: safe provided barriered against cluster_set_instance() or
+ *            cluster_destroy()
+ */
+const char *
+cluster_instance(CLUSTER *cluster)
+{
+	/* Note that we don't lock here: this call's effects, and its return
+	 * value, are undefined if not sufficiently protected against
+	 * cluster_set_instance() or cluster_destroy()
+	 */
+	return cluster->instid;
+}
+
+/* Set the instance identifier for this cluster */
 int
 cluster_set_instance(CLUSTER *cluster, const char *name)
 {
@@ -210,7 +250,7 @@ cluster_set_instance(CLUSTER *cluster, const char *name)
 	}
 	if(!name)
 	{
-		cluster_logf_locked_(cluster, LOG_ERR, "libcluster: attempt to set a NULL instance name\n");
+		cluster_logf_locked_(cluster, LOG_ERR, "libcluster: attempt to set a NULL instance identifier\n");
 		cluster_unlock_(cluster);
 		errno = EINVAL;
 		return -1;
@@ -218,7 +258,7 @@ cluster_set_instance(CLUSTER *cluster, const char *name)
 	p = strdup(name);
 	if(!p)
 	{
-		cluster_logf_locked_(cluster, LOG_CRIT, "libcluster: failed to duplicate instance name\n");
+		cluster_logf_locked_(cluster, LOG_CRIT, "libcluster: failed to duplicate instance identifier\n");
 		cluster_unlock_(cluster);
 		return -1;
 	}
@@ -226,7 +266,72 @@ cluster_set_instance(CLUSTER *cluster, const char *name)
 	cluster->instid = p;
 	if(cluster->flags & CF_VERBOSE)
 	{
-		cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: instance name now set to '%s'\n", cluster->instid);
+		cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: instance identifier set to '%s'\n", cluster->instid);
+	}
+	cluster_unlock_(cluster);
+	return 0;
+}
+
+/* Get the index of a worker in this cluster member (not valid when
+ * not joined)
+ */
+int
+cluster_index(CLUSTER *cluster, int worker)
+{
+	int r;
+
+	cluster_rdlock_(cluster);
+	if(cluster->flags & CF_JOINED)
+	{
+		r = cluster->inst_index + worker;
+	}
+	else
+	{
+		cluster_logf_locked_(cluster, LOG_WARNING, "libcluster: attempt to retrieve worker index when not joined\n");
+		errno = EPERM;
+		r = -1;
+	}
+	cluster_unlock_(cluster);
+	return 0;
+}
+
+/* Get the total worker count for this cluster (not valid when not joined) */
+int
+cluster_total(CLUSTER *cluster)
+{
+	int r;
+
+	cluster_rdlock_(cluster);
+	if(cluster->flags & CF_JOINED)
+	{
+		r = cluster->total_threads;
+	}
+	else
+	{
+		cluster_logf_locked_(cluster, LOG_WARNING, "libcluster: attempt to retrieve cluster thread count when not joined\n");
+		errno = EPERM;
+		r = 0;
+	}
+	cluster_unlock_(cluster);
+	return 0;
+}
+
+/* Get the number of threads (or 'sub-instances') this cluster member has */
+int
+cluster_workers(CLUSTER *cluster)
+{
+	int r;
+
+	cluster_rdlock_(cluster);
+	if(cluster->flags & CF_JOINED)
+	{
+		r = cluster->inst_threads;
+	}
+	else
+	{
+		cluster_logf_locked_(cluster, LOG_WARNING, "libcluster: attempt to retrieve member worker count when not joined\n");
+		errno = EPERM;
+		r = 0;
 	}
 	cluster_unlock_(cluster);
 	return 0;
@@ -304,22 +409,29 @@ cluster_set_registry(CLUSTER *cluster, const char *uri)
 	return -1;
 }
 
-/* Set the number of threads (or 'sub-instances') this cluster member has */
+/* Set the number of workers (or 'sub-instances') this cluster member has */
 int
-cluster_set_threads(CLUSTER *cluster, int nthreads)
+cluster_set_workers(CLUSTER *cluster, int nworkers)
 {
 	/* TODO: we should notify the ping thread that this has changed so that
 	 * that it doesn't take until cluster->etcd_refresh to inform other
 	 * nodes.
 	 */
 	cluster_wrlock_(cluster);
-	cluster->inst_threads = nthreads;
+	cluster->inst_threads = nworkers;
 	if(cluster->flags & CF_VERBOSE)
 	{
-		cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: number of threads in this instance set to %d\n", cluster->inst_threads);
+		cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: number of workers in this cluster member set to %d\n", cluster->inst_threads);
 	}
 	cluster_unlock_(cluster);
 	return 0;
+}
+
+/* DEPRECATED: provided only for binary compatibility */
+int
+cluster_set_threads(CLUSTER *cluster, int nthreads)
+{
+	return cluster_set_workers(cluster, nthreads);
 }
 
 /* Log a message when the cluster is already locked */
@@ -373,7 +485,7 @@ cluster_rebalanced_(CLUSTER *cluster)
 	CLUSTERSTATE state;
 
 	cluster_rdlock_(cluster);
-	cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: re-balanced; this instance has index %d (%d threads) from a total of %d\n", cluster->inst_index, cluster->inst_threads, cluster->total_threads);
+	cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: re-balanced; this instance has base index %d (%d workers) from a total of %d\n", cluster->inst_index, cluster->inst_threads, cluster->total_threads);
 	if(!cluster->balancer)
 	{
 		cluster_unlock_(cluster);
@@ -381,7 +493,7 @@ cluster_rebalanced_(CLUSTER *cluster)
 	}
 	memset(&state, 0, sizeof(state));
 	state.index = cluster->inst_index;
-	state.threads = cluster->inst_threads;
+	state.workers = cluster->inst_threads;
 	state.total = cluster->total_threads;
 	cluster_unlock_(cluster);
 	cluster->balancer(cluster, &state);

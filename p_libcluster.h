@@ -94,4 +94,7 @@ int cluster_static_leave_(CLUSTER *cluster);
 int cluster_etcd_join_(CLUSTER *cluster);
 int cluster_etcd_leave_(CLUSTER *cluster);
 
+/* Deprecated public methods retained for binary compatibility */
+int cluster_set_threads(CLUSTER *cluster, int nthreads);
+
 #endif /*!LIBCLUSTER_H_*/

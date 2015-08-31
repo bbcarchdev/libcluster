@@ -43,13 +43,13 @@ cluster_static_set_index(CLUSTER *cluster, int instindex)
 	cluster->inst_index = instindex;
 	if(cluster->flags & CF_VERBOSE)
 	{
-		cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: static: this instance's index set to %d\n", cluster->inst_index);
+		cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: static: this member's base index set to %d\n", cluster->inst_index);
 	}
 	cluster_unlock_(cluster);
 	return 0;
 }
 
-/* Set the total number of threads in the cluster */
+/* Set the total number of workers in the cluster */
 int
 cluster_static_set_total(CLUSTER *cluster, int total)
 {
@@ -63,7 +63,7 @@ cluster_static_set_total(CLUSTER *cluster, int total)
 	}
 	if(total < 1)
 	{
-		cluster_logf_locked_(cluster, LOG_ERR, "libcluster: static: thread count must be a positive integer\n");
+		cluster_logf_locked_(cluster, LOG_ERR, "libcluster: static: worker count must be a positive integer\n");
 		cluster_unlock_(cluster);
 		errno = EINVAL;
 		return -1;
@@ -71,7 +71,7 @@ cluster_static_set_total(CLUSTER *cluster, int total)
 	cluster->total_threads = total;
 	if(cluster->flags & CF_VERBOSE)
 	{
-		cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: static: total thread count set to %d\n", cluster->inst_index);
+		cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: static: total cluster worker count set to %d\n", cluster->inst_index);
 	}
 	cluster_unlock_(cluster);
 	return 0;
@@ -92,14 +92,14 @@ cluster_static_join_(CLUSTER *cluster)
 	}
 	if(cluster->inst_index >= cluster->total_threads)
 	{
-		cluster_logf_locked_(cluster, LOG_ERR, "libcluster: static: cannot join static cluster because the instance index (%d) is not less than the total number of threads in the cluster (%d)\n", cluster->inst_index, cluster->total_threads);
+		cluster_logf_locked_(cluster, LOG_ERR, "libcluster: static: cannot join static cluster because the instance index (%d) is not less than the total number of workers in the cluster (%d)\n", cluster->inst_index, cluster->total_threads);
 		cluster_unlock_(cluster);
 		errno = EINVAL;
 		return -1;
 	}
-	if(cluster->inst_index + cluster->inst_threads >= cluster->total_threads)
+	if(cluster->inst_index + cluster->inst_threads > cluster->total_threads)
 	{
-		cluster_logf_locked_(cluster, LOG_ERR, "libcluster: static: cannot join static cluster because the highest thread index (%d) is not less than the total number of threads in the cluster (%d)\n", cluster->inst_index + cluster->inst_threads, cluster->total_threads);
+		cluster_logf_locked_(cluster, LOG_ERR, "libcluster: static: cannot join static cluster because the highest worker index (%d) is not less than the total number of workers in the cluster (%d)\n", cluster->inst_index + cluster->inst_threads - 1, cluster->total_threads);
 		cluster_unlock_(cluster);
 		errno = EINVAL;
 		return -1;

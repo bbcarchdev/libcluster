@@ -54,9 +54,9 @@ balancer(CLUSTER *cluster, CLUSTERSTATE *state)
 	(void) cluster;
 
 	fprintf(stderr, "%s: cluster has re-balanced:\n", short_program_name);
-	fprintf(stderr, "   instance index:        %d\n", state->index);
-	fprintf(stderr, "   instance thread count: %d\n", state->threads);
-	fprintf(stderr, "   total thread count:    %d\n", state->total);
+	fprintf(stderr, "   first worker index:         %d\n", state->index);
+	fprintf(stderr, "   worker count:               %d\n", state->workers);
+	fprintf(stderr, "   total cluster worker count: %d\n", state->total);
 	return 0;
 }
 
@@ -71,12 +71,12 @@ usage(void)
 		   "  -k KEY                    Set the cluster key to KEY\n"
 		   "  -e ENV                    Set the cluster environment to ENV\n"
 		   "  -i ID                     Set the instance identifier to ID\n"
-		   "  -n COUNT                  Set the number of threads to COUNT\n"
+		   "  -n COUNT                  Set the number of workers to COUNT\n"
 		   " etcd-based clustering:\n"
 		   "  -r URI                    Set the cluster registry URI\n"
 		   " Static clustering:\n"
-		   "  -I INDEX                  Set this instance index to INDEX\n"
-		   "  -T COUNT                  Set the cluster total to COUNT\n",
+		   "  -I INDEX                  Set this instance base index to INDEX\n"
+		   "  -T COUNT                  Set the cluster worker total to COUNT\n",
 		   short_program_name);
 }
 
@@ -89,7 +89,7 @@ main(int argc, char **argv)
 	const char *env = NULL;
 	const char *registry = NULL;
 	const char *instid = NULL;
-	int nthreads = 0, instindex = 0, total = 0, verbose = 0;
+	int nworkers = 0, instindex = 0, total = 0, verbose = 0;
 	CLUSTER *cluster;
 
 	t = strrchr(argv[0], '/');
@@ -115,7 +115,7 @@ main(int argc, char **argv)
 			instid = optarg;
 			break;
 		case 'n':
-			nthreads = atoi(optarg);
+			nworkers = atoi(optarg);
 			break;
 		case 'r':
 			registry = optarg;
@@ -152,9 +152,9 @@ main(int argc, char **argv)
 	{
 		cluster_set_registry(cluster, registry);
 	}
-	if(nthreads)
+	if(nworkers)
 	{
-		cluster_set_threads(cluster, nthreads);
+		cluster_set_workers(cluster, nworkers);
 	}
 	if(instindex)
 	{
