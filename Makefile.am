@@ -31,6 +31,8 @@ pkgconfig_DATA = libcluster.pc
 
 lib_LTLIBRARIES = libcluster.la
 
+include_HEADERS = libcluster.h
+
 noinst_PROGRAMS = cluster-test
 
 AM_CPPFLAGS = @AM_CPPFLAGS@ @CPPFLAGS@ @LIBUUID_CPPFLAGS@ \
