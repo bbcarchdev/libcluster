@@ -1,4 +1,4 @@
-usr/lib
-usr/lib/pkgconfig
-usr/include
-
+usr/lib/libcluster.a
+usr/lib/libcluster.la
+usr/lib/pkgconfig/libcluster.pc
+usr/include/libcluster.h
