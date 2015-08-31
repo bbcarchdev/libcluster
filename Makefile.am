@@ -29,7 +29,7 @@ noinst_DATA = libcluster-uninstalled.pc
 
 pkgconfig_DATA = libcluster.pc
 
-noinst_LTLIBRARIES = libcluster.la
+lib_LTLIBRARIES = libcluster.la
 
 noinst_PROGRAMS = cluster-test
 
