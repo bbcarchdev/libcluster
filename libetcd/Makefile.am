@@ -21,11 +21,4 @@ libetcd_la_SOURCES = libetcd.h \
 	p_libetcd.h \
 	connect.c dir.c key.c
 
-libetcd_la_LDFLAGS = @AM_LDFLAGS@ \
-	@LIBJSONDATA_LDFLAGS@ @LIBURI_LDFLAGS@ @LIBCURL_LDFLAGS@ \
-	-noinst -avoid-version
-libetcd_la_LIBADD = \
-	@LIBJSONDATA_LOCAL_LIBS@ @LIBJSONDATA_LIBS@ \
-	@LIBURI_LOCAL_LIBS@ @LIBURI_LIBS@ \
-	@LIBCURL_LOCAL_LIBS@ @LIBCURL_LIBS@ \
-	@LIBS@
+libetcd_la_LDFLAGS = @AM_LDFLAGS@ -noinst -avoid-version

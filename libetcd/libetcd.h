@@ -18,9 +18,9 @@
 #ifndef LIBETCD_H_
 # define LIBETCD_H_                     1
 
-# include "liburi.h"
+# include <jansson.h>
 
-# include "jsondata.h"
+# include "liburi.h"
 
 typedef struct etcd_struct ETCD;
 
@@ -40,10 +40,10 @@ int etcd_set_verbose(ETCD *etcd, int verbose);
 
 ETCD *etcd_dir_open(ETCD *parent, const char *name);
 ETCD *etcd_dir_create(ETCD *parent, const char *name, ETCDFLAGS flags);
-int etcd_dir_get(ETCD *dir, jd_var *out);
+int etcd_dir_get(ETCD *dir, json_t **out);
 int etcd_dir_delete(ETCD *parent, const char *name, ETCDFLAGS flags);
 void etcd_dir_close(ETCD *dir);
-int etcd_dir_wait(ETCD *dir, ETCDFLAGS flags, jd_var *change);
+int etcd_dir_wait(ETCD *dir, ETCDFLAGS flags, json_t **change);
 
 int etcd_key_set(ETCD *dir, const char *name, const char *value, ETCDFLAGS flags);
 int etcd_key_delete(ETCD *dir, const char *name, ETCDFLAGS flags);

@@ -24,6 +24,7 @@
 # include <ctype.h>
 
 # include <curl/curl.h>
+# include <jansson.h>
 
 # include "libetcd.h"
 
@@ -43,6 +44,6 @@ CURL *etcd_curl_put_(ETCD *etcd, URI *uri, const char *data, const char *query);
 CURL *etcd_curl_delete_(ETCD *etcd, URI *uri, const char *query);
 void etcd_curl_done_(CURL *ch);
 int etcd_curl_perform_(CURL *ch);
-int etcd_curl_perform_json_(CURL *ch, jd_var *dict);
+int etcd_curl_perform_json_(CURL *ch, json_t **dict);
 
 #endif /*!P_LIBETCD_H_*/

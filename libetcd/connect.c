@@ -202,12 +202,13 @@ etcd_curl_perform_(CURL *ch)
 }
 
 int
-etcd_curl_perform_json_(CURL *ch, jd_var *dict)
+etcd_curl_perform_json_(CURL *ch, json_t **dict)
 {
 	CURLcode c;
 	long status;
 	struct etcd_data_struct data;
 
+	*dict = NULL;
 	memset(&data, 0, sizeof(data));
 	data.ch = ch;
 	curl_easy_setopt(data.ch, CURLOPT_WRITEFUNCTION, etcd_payload_);
@@ -227,9 +228,13 @@ etcd_curl_perform_json_(CURL *ch, jd_var *dict)
 	{
 		if(data.len)
 		{
-			jd_from_jsons(dict, data.buf);
+			*dict = json_loads(data.buf, 0, NULL);
 		}
 		free(data.buf);
+		if(data.len && !*dict)
+		{
+			return -1;
+		}
 		return 0;
 	}
 	free(data.buf);

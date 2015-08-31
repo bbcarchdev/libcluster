@@ -47,10 +47,6 @@ libcluster_la_LDFLAGS = @AM_LDFLAGS@ \
 	-noinst -avoid-version
 
 libcluster_la_LIBADD = \
-	libetcd/libetcd.la \
-	@LIBURI_LOCAL_LIBS@ @LIBURI_LIBS@ \
-	@LIBJSONDATA_LOCAL_LIBS@ @LIBJSONDATA_LIBS@ \
-	@LIBUUID_LOCAL_LIBS@ @LIBUUID_LIBS@ \
-	@PTHREAD_LOCAL_LIBS@ @PTHREAD_LIBS@
+	libetcd/libetcd.la @LOCAL_LIBS@ @LIBS@
 
 cluster_test_LDADD = libcluster.la

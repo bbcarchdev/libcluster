@@ -8,5 +8,5 @@ Description: @PACKAGE_DESC@
 URL: @PACKAGE_URL@
 Version: @PACKAGE_VERSION@
 Libs: -L${libdir} -lcluster
-Libs.private: @LIBS@
+Libs.private: @LOCAL_LIBS@ @LIBS@
 Cflags: -I${includedir}

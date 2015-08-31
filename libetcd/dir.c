@@ -83,8 +83,7 @@ etcd_dir_open(ETCD *parent, const char *name)
 	ETCD *dir;
 	CURL *ch;
 	int status;
-	jd_var dict = JD_INIT;
-	jd_var *node, *k;
+	json_t *dict, *jnode, *jdir;
 
 	dir = etcd_dir_create_(parent, name);
 	if(!dir)
@@ -97,23 +96,21 @@ etcd_dir_open(ETCD *parent, const char *name)
 		etcd_dir_close(dir);
 		return NULL;
 	}
-	JD_SCOPE
-	{		
-		status = etcd_curl_perform_json_(ch, &dict);
-		if(!status && dict.type == HASH)
+	status = etcd_curl_perform_json_(ch, &dict);
+	if(!status)
+	{
+		status = 1;
+		jnode = json_object_get(dict, "node");
+		if(jnode && json_typeof(jnode) == JSON_OBJECT)
 		{
-			status = 1;
-			node = jd_get_ks(&dict, "node", 0);
-			if(node &&
-			   node->type == HASH &&
-			   (k = jd_get_ks(node, "dir", 0)) &&
-			   jd_cast_int(k))
+			jdir = json_object_get(jnode, "dir");
+			if(jdir && json_is_true(jdir))
 			{
 				/* Entry is a directory */
 				status = 0;
 			}
 		}
-		jd_release(&dict);
+		json_decref(dict);
 	}
 	etcd_curl_done_(ch);
 	if(status)
@@ -169,15 +166,15 @@ etcd_dir_close(ETCD *dir)
 }
 
 int
-etcd_dir_get(ETCD *dir, jd_var *out)
+etcd_dir_get(ETCD *dir, json_t **out)
 {
 	CURL *ch;
 	int status;
-	jd_var dict = JD_INIT;
-	jd_var *node, *nodes, *entry, *key, *outkey;
+   	json_t *dict, *node, *nodes, *entry, *key;
 	const char *str, *t;
 	size_t c, n;
 
+	*out = NULL;
 	ch = etcd_curl_create_(dir, dir->uri, NULL);
 	if(!ch)
 	{
@@ -187,58 +184,63 @@ etcd_dir_get(ETCD *dir, jd_var *out)
 	etcd_curl_done_(ch);
 	if(status)
 	{
-		jd_release(&dict);
+		json_decref(dict);
 		return status;
 	}
-	if(dict.type != HASH)
+	if(json_typeof(dict) != JSON_OBJECT)
 	{
-		jd_release(&dict);
+		json_decref(dict);
 		return -1;
 	}
-	if(!(node = jd_get_ks(&dict, "node", 0)) || node->type != HASH)
+	if(!(node = json_object_get(dict, "node")) || json_typeof(node) != JSON_OBJECT)
 	{
-		jd_release(&dict);
+		json_decref(dict);
 		return -1;
 	}
-	if(!(nodes = jd_get_ks(node, "nodes", 0)) || nodes->type != ARRAY)
+	if(!(nodes = json_object_get(node, "nodes")) || json_typeof(nodes) != JSON_ARRAY)
 	{
-		jd_release(&dict);
-		jd_set_hash(out, 1);
+		/* Return an empty array */
+		json_decref(dict);
+		*out = json_object();
 		return 0;
 	}
-	c = jd_count(nodes);
-	jd_set_hash(out, c);
+	/* Transform the returned array into an object, where the 'key' member of
+	 * each array member (itself an object) is used as the key in the returned
+	 * hash.
+	 */
+	c = json_array_size(nodes);
+	*out = json_object();
 	for(n = 0; n < c; n++)
 	{
-		entry = jd_get_idx(nodes, n);
-		key = jd_get_ks(entry, "key", 0);
-		if(key && key->type == STRING)
-		{
-			str = jd_bytes(key, NULL);
+		entry = json_array_get(nodes, n);
+		key = json_object_get(entry, "key");
+		if(key && json_typeof(key) == JSON_STRING)
+		{		   
+			str = json_string_value(key);
 			t = strrchr(str, '/');
 			if(t)
 			{
 				t++;
-				outkey = jd_get_ks(out, t, 1);
 			}
 			else
 			{
-				outkey = jd_get_ks(out, str, 1);
+				t = str;
 			}
-			jd_clone(outkey, entry, 1);
+			json_object_set(*out, t, entry);
 		}
 	}
-	jd_release(&dict);
+	json_decref(dict);
 	return 0;
 }
 
 int
-etcd_dir_wait(ETCD *dir, ETCDFLAGS flags, jd_var *out)
+etcd_dir_wait(ETCD *dir, ETCDFLAGS flags, json_t **out)
 {
 	CURL *ch;
 	const char *data = "wait=true", *rdata = "wait=true&recursive=true";
 	int status, recursive;
 
+	*out = NULL;
 	recursive = (flags & ETCD_RECURSE);
 	ch = etcd_curl_create_(dir, dir->uri, (recursive ? rdata : data));
 	if(!ch)

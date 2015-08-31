@@ -26,6 +26,8 @@ static int cluster_etcd_unping_(CLUSTER *cluster, ETCDFLAGS flags);
 static void *cluster_etcd_ping_thread_(void *arg);
 static void *cluster_etcd_balancer_thread_(void *arg);
 static int cluster_etcd_balance_(CLUSTER *cluster);
+static const char **cluster_etcd_json_keys_(json_t *dict);
+static int cluster_etcd_sort_(const void *ptra, const void *ptrb);
 
 /* Join an etcd-based cluster. To do this, we first update the relevant
  * directory with information about ourselves, then spawn a 're-balancing
@@ -173,72 +175,58 @@ static int
 cluster_etcd_balance_(CLUSTER *cluster)
 {
 	int total, base, val;
-	size_t n, c;
-	const char *name;
+	size_t n;
+	const char **keys;
+	json_t *dict, *entry, *value;
 
 	if(cluster->flags & CF_VERBOSE)
 	{
 		cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: etcd: reading state from registry directory\n");
 	}
 	base = -1;
-	JD_SCOPE
+	if(etcd_dir_get(cluster->etcd_envdir, &dict))
 	{
-		jd_var dict = JD_INIT, keys = JD_INIT;
-		jd_var *key, *entry, *value;
-
-		if(etcd_dir_get(cluster->etcd_envdir, &dict))
-		{
-			cluster_logf_locked_(cluster, LOG_ERR, "libcluster: etcd: failed to retrieve cluster directory\n");
-			return -1;
-		}
-		jd_keys(&keys, &dict);
-		jd_sort(&keys);
-		c = jd_count(&keys);
-		total = 0;
-		if(cluster->flags & CF_VERBOSE)
-		{
-			cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: etcd: re-balancing cluster %s/%s:\n", cluster->key, cluster->env);
-		}
-		for(n = 0; n < c; n++)
-		{
-			key = jd_get_idx(&keys, n);
-			name = jd_bytes(key, NULL);
-			entry = jd_get_key(&dict, key, 0);
-			if(!entry || entry->type != HASH)
-			{
-				continue;
-			}
-			value = jd_get_ks(entry, "value", 0);
-			if(!value)
-			{
-				continue;
-			}
-			JD_TRY
-			{
-				val = jd_get_int(value);
-			}
-			JD_CATCH(e)
-			{
-				val = 0;
-			}
-			if(!strcmp(name, cluster->instid))
-			{
-				if(cluster->flags & CF_VERBOSE)
-				{
-					cluster_logf_locked_(cluster, LOG_DEBUG, "* %s [%d]\n", cluster->instid, total);
-				}
-				base = total;
-			}
-			else
-			{
-				if(cluster->flags & CF_VERBOSE)
-				{
-					cluster_logf_locked_(cluster, LOG_DEBUG, "  %s [%d]\n", name, total);
-				}
-			}
-			total += val;
-		}
+		cluster_logf_locked_(cluster, LOG_ERR, "libcluster: etcd: failed to retrieve cluster directory\n");
+		return -1;
 	}
+	keys = cluster_etcd_json_keys_(dict);
+	total = 0;
+	if(cluster->flags & CF_VERBOSE)
+	{
+		cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: etcd: re-balancing cluster %s/%s:\n", cluster->key, cluster->env);
+	}
+	for(n = 0; keys[n]; n++)
+	{
+		entry = json_object_get(dict, keys[n]);
+		if(!entry || !json_is_object(entry))
+		{
+			continue;
+		}
+		value = json_object_get(entry, "value");
+		if(!value)
+		{
+			continue;
+		}
+		val = json_integer_value(value);
+		if(!strcmp(keys[n], cluster->instid))
+		{
+			if(cluster->flags & CF_VERBOSE)
+			{
+				cluster_logf_locked_(cluster, LOG_DEBUG, "* %s [%d]\n", cluster->instid, total);
+			}
+			base = total;
+		}
+		else
+		{
+			if(cluster->flags & CF_VERBOSE)
+			{
+				cluster_logf_locked_(cluster, LOG_DEBUG, "  %s [%d]\n", keys[n], total);
+			}
+		}
+		total += val;
+	}
+	free(keys);
+	json_decref(dict);
 	if(total != cluster->total_threads || base != cluster->inst_index)
 	{
 		if(base == -1)
@@ -335,6 +323,7 @@ cluster_etcd_balancer_thread_(void *arg)
 	CLUSTER *cluster;
 	ETCD *dir;
 	int r, verbose;
+	json_t *change;
 
 	cluster = (CLUSTER *) arg;
 	cluster_rdlock_(cluster);
@@ -356,25 +345,24 @@ cluster_etcd_balancer_thread_(void *arg)
 			cluster_unlock_(cluster);
 			break;
 		}
-		JD_SCOPE
+		if(verbose)
 		{
-			jd_var change = JD_INIT;
-
-			if(verbose)
-			{
-				cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: etcd: waiting for changes to %s/%s\n", cluster->key, cluster->env);
-			}
-			/* Wait for changes to the directory; we must release the acquired
-			 * read lock while we do this (or the ping thread will be
-			 * prevented from working until this loop completes).
-			 */
-			cluster_unlock_(cluster);
-			r = etcd_dir_wait(cluster->etcd_envdir, ETCD_RECURSE, &change);
-			if(verbose)
-			{
-				cluster_logf_(cluster, LOG_DEBUG, "libcluster: etcd: wait result was %d\n", r);
-			}
-			jd_release(&change);
+			cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: etcd: waiting for changes to %s/%s\n", cluster->key, cluster->env);
+		}
+		/* Wait for changes to the directory; we must release the acquired
+		 * read lock while we do this (or the ping thread will be
+		 * prevented from working until this loop completes).
+		 */
+		cluster_unlock_(cluster);
+		change = NULL;
+		r = etcd_dir_wait(cluster->etcd_envdir, ETCD_RECURSE, &change);
+		if(change)
+		{
+			json_decref(change);
+		}
+		if(verbose)
+		{
+			cluster_logf_(cluster, LOG_DEBUG, "libcluster: etcd: wait result was %d\n", r);
 		}
 		if(r)
 		{
@@ -396,4 +384,37 @@ cluster_etcd_balancer_thread_(void *arg)
 	etcd_dir_close(dir);
 	return NULL;
 }
-			
+
+/* Return a sorted array containing the keys from a JSON object */
+static const char **
+cluster_etcd_json_keys_(json_t *dict)
+{
+	const char **keys;
+	json_t *value;
+	const char *key;
+	size_t n;
+
+	keys = (const char **) calloc(json_object_size(dict) + 1, sizeof(const char *));
+	if(!keys)
+	{
+		return NULL;
+	}
+	n = 0;
+	json_object_foreach(dict, key, value)
+	{
+		keys[n] = key;
+		n++;
+	}
+	qsort(keys, n, sizeof(const char *), cluster_etcd_sort_);
+	return keys;
+}
+
+static int
+cluster_etcd_sort_(const void *ptra, const void *ptrb)
+{
+	const char **a, **b;
+
+	a = (const char **) ptra;
+	b = (const char **) ptrb;
+	return strcmp(*a, *b);
+}
