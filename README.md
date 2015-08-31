@@ -281,3 +281,19 @@ $ sudo make install
 You will need [liburi](https://github.com/bbcarchdev/liburi) to build
 libcluster; if you check out a copy as a subdirectory of this source tree,
 it will be built and installed automatically as part of libcluster.
+
+You will also need [Jansson](http://www.digip.org/jansson/), a library for
+parsing and manipulating JSON. Jansson is packaged with most major
+distributions, but can be built and installed from source if necessary.
+
+## Copyright
+
+Copyright © 2014-2015 [BBC](http://www.bbc.co.uk/)
+
+libcluster is an open source project released under the terms of the
+[Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0).
+
+libcluster was developed as part of the [Research & Education Space](https://bbcarchdev.github.io/res/),
+and was originally part of the [Anansi](https://github.com/bbcarchdev/anansi)
+project.
+
