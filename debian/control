@@ -2,14 +2,14 @@ Source: libcluster
 Section: net
 Priority: extra
 Maintainer: Mo McRoberts <mo.mcroberts@bbc.co.uk>
-Build-Depends: debhelper (>= 8.0.0), liburi-dev, uuid-dev, libjansson-dev, libcurl4-openssl-dev, libssl-dev, pkg-config, automake, autoconf, libtool
+Build-Depends: debhelper (>= 8.0.0), liburi-dev, uuid-dev, libjansson-dev, libcurl4-openssl-dev, pkg-config, automake, autoconf, libtool
 
 Package: libcluster
 Architecture: any
-Depends: ${misc:Depends}, ${shlibs:Depends}, liburi, libuuid1, libjansson4, libcurl3, libssl1.0.0
+Depends: ${misc:Depends}, ${shlibs:Depends}, liburi, libuuid1, libjansson4, libcurl3
 Description: Application cluster support library
 
 Package: libcluster-dev
 Architecture: any
-Depends: ${misc:Depends}, liburi-dev, uuid-dev, libjansson-dev, libcurl4-openssl-dev, libssl-dev
+Depends: ${misc:Depends}, liburi-dev, uuid-dev, libjansson-dev, libcurl-dev
 Description: Application cluster support library (development files)
