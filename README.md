@@ -39,8 +39,7 @@ work between nodes.
 
 Applications using libcluster do not have to be multi-threaded, although
 depending upon the clustering type in use, it may launch and manage its own
-threads. Single-threaded applications are considered by libcluster to be an
-application which has a single worker thread.
+threads.
 
 Cluster connections are configured with:
 
