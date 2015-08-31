@@ -265,3 +265,19 @@ This transcript was from `node1`, after both `node2` and `node3` were started.
 We can see that the base index of `node2` is `2`, because `node1` has thread
 indices `0` and `1`; meanwhile `node3` has thread indices `3..6`, giving a
 total thread count of `7`.
+
+## Building libcluster
+
+To build from a git checkout:
+
+```
+$ git submodule update --init --recursive
+$ autoreconf -i
+$ ./configure [usual configure options]
+$ make
+$ sudo make install
+```
+
+You will need [liburi](https://github.com/bbcarchdev/liburi) to build
+libcluster; if you check out a copy as a subdirectory of this source tree,
+it will be built and installed automatically as part of libcluster.
