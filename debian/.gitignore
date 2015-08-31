@@ -1,0 +1,8 @@
+*.substvars
+*.log
+*.debhelper
+/files
+/tmp
+/libcluster
+/libcluster-dev
+
