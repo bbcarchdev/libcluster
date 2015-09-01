@@ -306,7 +306,7 @@ cluster_index(CLUSTER *cluster, int worker)
 		r = -1;
 	}
 	cluster_unlock_(cluster);
-	return 0;
+	return r;
 }
 
 /* Get the total worker count for this cluster (not valid when not joined) */
@@ -327,7 +327,7 @@ cluster_total(CLUSTER *cluster)
 		r = 0;
 	}
 	cluster_unlock_(cluster);
-	return 0;
+	return r;
 }
 
 /* Get the number of threads (or 'sub-instances') this cluster member has */
@@ -348,7 +348,7 @@ cluster_workers(CLUSTER *cluster)
 		r = 0;
 	}
 	cluster_unlock_(cluster);
-	return 0;
+	return r;
 }
 
 /* Set the logging callback */
