@@ -34,7 +34,7 @@ BT_ENABLE_XSI
 LT_INIT
 BT_DEFINE_PREFIX
 
-need_syslog=yes
+need_syslog=no
 need_pthread=no
 need_libuuid=yes
 need_libcurl=no
@@ -43,6 +43,12 @@ need_liburi=no
 convenience_libs=''
 
 dnl Feature tests
+
+dnl --disable-logging (enabled by default)
+AC_ARG_ENABLE([logging],[AS_HELP_STRING([disable-logging],[disable logging callbacks])],[enable_logging=$enableval],[enable_logging=yes])
+if test x"$enable_logging" = x"yes" ; then
+	need_syslog=yes
+fi
 
 dnl --disable-pthreads (enabled by default, and overidden by etcd)
 AC_ARG_ENABLE([pthreads],[AS_HELP_STRING([disable-pthreads],[disable POSIX threads (note: POSIX threads are required by etcd support)])],[enable_pthreads=$enableval],[enable_pthreads=yes])
@@ -65,15 +71,16 @@ fi
 dnl Feature dependencies
 test x"$enable_pthreads" = x"yes" && need_pthreads=yes
 
+if test x"$enable_logging" = x"yes" ; then
+	AC_DEFINE_UNQUOTED([ENABLE_LOGGING],[1],[define to 1 to build with logging callback support])
+fi
+
 if test x"$enable_pthreads" = x"yes" ; then
 	AC_DEFINE_UNQUOTED([ENABLE_ETCD],[1],[define to 1 to build with etcd support])
-	need_pthreads=yes
 fi
 
 if test x"$enable_etcd" = x"yes" ; then
 	AC_DEFINE_UNQUOTED([ENABLE_ETCD],[1],[define to 1 to build with etcd support])
-	dnl Note that we need pthreads for etcd support even if another option
-    dnl disables them.
 fi
 
 dnl Feature summaries
@@ -81,7 +88,8 @@ AC_MSG_CHECKING([whether to build with etcd support])
 AC_MSG_RESULT([$enable_etcd])
 AC_MSG_CHECKING([whether to build with POSIX threads support])
 AC_MSG_RESULT([$enable_pthreads])
-
+AC_MSG_CHECKING([whether to build with logging callbacks])
+AC_MSG_RESULT([$enable_logging])
 
 dnl Dependency tests
 

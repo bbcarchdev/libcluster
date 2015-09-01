@@ -355,9 +355,13 @@ cluster_workers(CLUSTER *cluster)
 int
 cluster_set_logger(CLUSTER *cluster, void (*logger)(int priority, const char *format, va_list ap))
 {
+	(void) cluster;
+	(void) logger;
+#ifdef ENABLE_LOGGING
 	cluster_wrlock_(cluster);
 	cluster->logger = logger;
 	cluster_unlock_(cluster);
+#endif
 	return 0;
 }
 
@@ -386,7 +390,7 @@ cluster_set_registry(CLUSTER *cluster, const char *uri)
 		return -1;
 	}
 	if(!uri)
-	{		
+	{
 		free(cluster->registry);
 		cluster->type = CT_STATIC;
 		if(cluster->flags & CF_VERBOSE)
@@ -451,16 +455,28 @@ cluster_set_threads(CLUSTER *cluster, int nthreads)
 }
 
 /* Log a message when the cluster is already locked */
+/* Because this function is varadic, we provide a no-op implementation
+ * rather than using macros to eliminate calls if the compiler doesn't
+ * provide a sensible way to do that.
+ */
+#if ENABLE_LOGGING || NEED_LOGGING_NOOPS
 void
 cluster_logf_locked_(CLUSTER *cluster, int priority, const char *format, ...)
 {
+#ifdef ENABLE_LOGGING
 	va_list ap;
 
 	va_start(ap, format);
 	cluster_vlogf_locked_(cluster, priority, format, ap);
 	va_end(ap);
+#else
+	(void) cluster;
+	(void) priority;
+#endif
 }
+#endif /*ENABLE_LOGGING || NEED_LOGGING_NOOPS*/
 
+#ifdef ENABLE_LOGGING
 void
 cluster_vlogf_locked_(CLUSTER *cluster, int priority, const char *format, va_list ap)
 {
@@ -477,11 +493,14 @@ cluster_vlogf_locked_(CLUSTER *cluster, int priority, const char *format, va_lis
 		}
 	}
 }
+#endif /*ENABLE_LOGGING*/
 
 /* Log a message */
+#if ENABLE_LOGGING || NEED_LOGGING_NOOPS
 void
 cluster_logf_(CLUSTER *cluster, int priority, const char *format, ...)
 {
+#ifdef ENABLE_LOGGING
 	va_list ap;
 
 	va_start(ap, format);
@@ -489,7 +508,12 @@ cluster_logf_(CLUSTER *cluster, int priority, const char *format, ...)
 	cluster_vlogf_locked_(cluster, priority, format, ap);
 	cluster_unlock_(cluster);
 	va_end(ap);
+#else
+	(void) cluster;
+	(void) priority;
+#endif
 }
+#endif /*ENABLE_LOGGING || NEED_LOGGING_NOOPS*/
 
 /* Inform the calling application that the cluster has been re-balanced.
  * The calling thread should not hold the lock when this function is

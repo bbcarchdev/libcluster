@@ -118,7 +118,9 @@ struct cluster_struct
 	int inst_threads;
 	int total_threads;
 	/* Callbacks */
+# ifdef ENABLE_LOGGING
 	void (*logger)(int priority, const char *format, va_list ap);
+# endif
 	CLUSTERBALANCE balancer;
 # ifdef ENABLE_ETCD
 	/* etcd-based clustering */
@@ -137,6 +139,19 @@ struct cluster_struct
 void cluster_logf_(CLUSTER *cluster, int priority, const char *format, ...);
 void cluster_logf_locked_(CLUSTER *cluster, int priority, const char *format, ...);
 void cluster_vlogf_locked_(CLUSTER *cluster, int priority, const char *format, va_list ap);
+
+# ifndef ENABLE_LOGGING
+#  if __STDC_VERSION__ >= 199901L
+#   define cluster_logf_(...)          /* */
+#   define cluster_logf_locked_(...)   /* */
+#  elif __GNUC__
+#   define cluster_logf_(cluster...)   /* */
+#   define cluster_logf_locked_(cluster...) /* */
+#  else
+#   define NEED_LOGGING_NOOPS          1
+#  endif
+#  define cluster_vlogf_locked_(c, p, f, a) /* */
+# endif
 
 void cluster_rdlock_(CLUSTER *cluster);
 void cluster_wrlock_(CLUSTER *cluster);
