@@ -21,12 +21,24 @@
 # include <stdio.h>
 # include <stdlib.h>
 # include <string.h>
-# include <unistd.h>
-# include <syslog.h>
-# include <pthread.h>
 # include <ctype.h>
 # include <errno.h>
-# include <uuid/uuid.h>
+
+# ifdef HAVE_UNISTD_H
+#  include <unistd.h>
+# endif
+
+# ifdef HAVE_SYSLOG_H
+#  include <syslog.h>
+# endif
+
+# ifdef WITH_PTHREAD
+#  include <pthread.h>
+# endif
+
+# ifdef WITH_LIBUUID
+#  include <uuid/uuid.h>
+# endif
 
 # include "libetcd.h"
 # include "libcluster.h"
@@ -56,7 +68,9 @@ struct cluster_struct
 {
 	CLUSTERTYPE type;
 	CLUSTERFLAGS flags;
+# ifdef WITH_PTHREAD
 	pthread_rwlock_t lock;
+# endif
 	char *instid;
 	char *key;
 	char *env;
@@ -72,8 +86,10 @@ struct cluster_struct
 	ETCD *etcd_root;
 	ETCD *etcd_clusterdir;
 	ETCD *etcd_envdir;
+# ifdef WITH_PTHREAD
 	pthread_t ping_thread;
 	pthread_t balancer_thread;
+# endif
 	int etcd_ttl;
 	int etcd_refresh;
 };
