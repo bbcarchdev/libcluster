@@ -53,6 +53,41 @@
 /* Default etcd refresh time */
 # define CLUSTER_DEFAULT_REFRESH        30
 
+/* We only use syslog for the LOG_xxx constants; if they aren't available
+ * we can provide generic values instead.
+ */
+# ifndef LOG_EMERG
+#  define LOG_EMERG                    0
+# endif
+
+# ifndef LOG_ALERT
+#  define LOG_ALERT                    1
+# endif
+
+# ifndef LOG_CRIT
+#  define LOG_CRIT                     2
+# endif
+
+# ifndef LOG_ERR
+#  define LOG_ERR                      3
+# endif
+
+# ifndef LOG_WARNING
+#  define LOG_WARNING                  4
+# endif
+
+# ifndef LOG_NOTICE
+#  define LOG_NOTICE                   5
+# endif
+
+# ifndef LOG_INFO
+#  define LOG_INFO                     6
+# endif
+
+# ifndef LOG_DEBUG
+#  define LOG_DEBUG                    7
+# endif
+
 typedef enum
 {
 	CT_STATIC,
