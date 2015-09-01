@@ -34,15 +34,62 @@ BT_ENABLE_XSI
 LT_INIT
 BT_DEFINE_PREFIX
 
-AC_CHECK_HEADERS([unistd.h syslog.h])
+need_syslog=yes
+need_pthread=yes
+need_libuuid=yes
+need_libcurl=no
+need_libjansson=no
+need_liburi=no
+convenience_libs=''
 
-BT_REQUIRE_PTHREAD
-BT_REQUIRE_LIBCURL
-BT_REQUIRE_LIBJANSSON
-BT_REQUIRE_LIBUUID
+dnl Feature tests
 
-dnl Always check for liburi last because it may be uninstalled
-BT_REQUIRE_LIBURI_INCLUDED
+dnl --disable-etcd (etcd support is enabled by default)
+AC_MSG_CHECKING([whether to build with etcd support])
+AC_ARG_ENABLE([etcd],[AS_HELP_STRING([disable-etcd],[disable etcd support])],[enable_etcd=$enableval],[enable_etcd=yes])
+AC_MSG_RESULT([$enable_etcd])
+AM_CONDITIONAL([ENABLE_ETCD],[test x"$enable_etcd" = x"yes"])
+if test x"$enable_etcd" = x"yes" ; then
+	AC_DEFINE_UNQUOTED([ENABLE_ETCD],[1],[define to 1 to build with etcd support])
+	dnl Note that we need pthreads for etcd support even if another option
+    dnl disables them.
+	need_pthread=yes
+	need_libcurl=yes
+	need_liburi=yes
+	need_libjansson=yes
+	convenience_libs="$convenience_libs \${top_builddir}/libetcd/libetcd.la"
+fi
+
+dnl Dependency tests
+
+AC_CHECK_HEADERS([unistd.h])
+
+if test x"$need_syslog" = x"yes" ; then
+	AC_CHECK_HEADERS([syslog.h])
+fi
+
+if test x"$need_pthread" = x"yes" ; then
+	BT_REQUIRE_PTHREAD
+fi
+
+if test x"$need_libcurl" = x"yes" ; then
+	BT_REQUIRE_LIBCURL
+fi
+
+if test x"$need_libjansson" = x"yes" ; then
+	BT_REQUIRE_LIBJANSSON
+fi
+
+if test x"$need_libuuid" = x"yes" ; then
+	BT_REQUIRE_LIBUUID
+fi
+
+dnl Always check for liburi last because it may be not-yet-installed
+if test x"$need_liburi" = x"yes" ; then
+	BT_REQUIRE_LIBURI_INCLUDED
+fi
+
+AC_SUBST([convenience_libs])
 
 AC_CONFIG_FILES([
 Makefile

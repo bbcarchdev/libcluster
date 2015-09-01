@@ -17,7 +17,11 @@
 
 ACLOCAL_AMFLAGS = -I m4
 
+if ENABLE_ETCD
+
 SUBDIRS = libetcd .
+
+endif
 
 EXTRA_DIST = README.md LICENSE-2.0 libcluster.pc.in libcluster-uninstalled.pc.in
 
@@ -47,6 +51,6 @@ libcluster_la_LDFLAGS = @AM_LDFLAGS@ \
 	-noinst -avoid-version
 
 libcluster_la_LIBADD = \
-	libetcd/libetcd.la @LOCAL_LIBS@ @LIBS@
+	@convenience_libs@ @LOCAL_LIBS@ @LIBS@
 
 cluster_test_LDADD = libcluster.la

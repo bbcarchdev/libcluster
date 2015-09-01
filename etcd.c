@@ -21,6 +21,8 @@
 
 #include "p_libcluster.h"
 
+#ifdef ENABLE_ETCD
+
 static int cluster_etcd_ping_(CLUSTER *cluster, ETCDFLAGS flags);
 static int cluster_etcd_unping_(CLUSTER *cluster, ETCDFLAGS flags);
 static void *cluster_etcd_ping_thread_(void *arg);
@@ -418,3 +420,5 @@ cluster_etcd_sort_(const void *ptra, const void *ptrb)
 	b = (const char **) ptrb;
 	return strcmp(*a, *b);
 }
+
+#endif /*ENABLE_ETCD*/

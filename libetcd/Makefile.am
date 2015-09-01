@@ -15,6 +15,8 @@
 ##  limitations under the License.
 ##
 
+if ENABLE_ETCD
+
 noinst_LTLIBRARIES = libetcd.la
 
 libetcd_la_SOURCES = libetcd.h \
@@ -22,3 +24,5 @@ libetcd_la_SOURCES = libetcd.h \
 	connect.c dir.c key.c
 
 libetcd_la_LDFLAGS = @AM_LDFLAGS@ -noinst -avoid-version
+
+endif

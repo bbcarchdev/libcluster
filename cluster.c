@@ -35,7 +35,9 @@ cluster_create(const char *key)
 	{
 		return NULL;
 	}
+#ifdef WITH_PTHREAD
 	pthread_rwlock_init(&(p->lock), NULL);
+#endif
 	p->inst_threads = 1;
 	p->instid = (char *) malloc(33);
 	if(!p->instid)
@@ -70,8 +72,10 @@ cluster_create(const char *key)
 		cluster_destroy(p);
 		return NULL;
 	}
+#ifdef ENABLE_ETCD
 	p->etcd_ttl = CLUSTER_DEFAULT_TTL;
 	p->etcd_refresh = CLUSTER_DEFAULT_REFRESH;
+#endif
 	return p;
 }
 
@@ -86,7 +90,9 @@ cluster_destroy(CLUSTER *cluster)
 	free(cluster->env);
 	free(cluster->registry);
 	cluster_unlock_(cluster);
+#ifdef WITH_PTHREAD
 	pthread_rwlock_destroy(&(cluster->lock));
+#endif
 	free(cluster);
 	return 0;
 }
@@ -112,8 +118,12 @@ cluster_join(CLUSTER *cluster)
 	{
 	case CT_STATIC:
 		return cluster_static_join_(cluster);
+#ifdef ENABLE_ETCD
 	case CT_ETCD:
 		return cluster_etcd_join_(cluster);
+#endif
+	default:
+		break;
 	}
 	return 0;
 }
@@ -136,8 +146,12 @@ cluster_leave(CLUSTER *cluster)
 	{
 	case CT_STATIC:
 		return cluster_static_leave_(cluster);
+#ifdef ENABLE_ETCD
 	case CT_ETCD:
 		return cluster_etcd_leave_(cluster);
+#endif
+	default:
+		break;
 	}
 	return 0;
 }
@@ -363,8 +377,6 @@ cluster_set_balancer(CLUSTER *cluster, CLUSTERBALANCE callback)
 int
 cluster_set_registry(CLUSTER *cluster, const char *uri)
 {
-	char *p;
-
    	cluster_wrlock_(cluster);
 	if(cluster->flags & CF_JOINED)
 	{
@@ -384,8 +396,11 @@ cluster_set_registry(CLUSTER *cluster, const char *uri)
 		cluster_unlock_(cluster);
 		return 0;
 	}
+#ifdef ENABLE_ETCD
 	if(!strncmp(uri, "http:", 5))
 	{
+		char *p;
+
 		p = strdup(uri);
 		if(!p)
 		{
@@ -403,6 +418,7 @@ cluster_set_registry(CLUSTER *cluster, const char *uri)
 		cluster_unlock_(cluster);
 		return 0;
 	}
+#endif
 	cluster_logf_locked_(cluster, LOG_ERR, "libcluster: unsupported scheme in registry URI <%s>\n", uri);
 	cluster_unlock_(cluster);
 	errno = EINVAL;
@@ -508,7 +524,11 @@ cluster_rebalanced_(CLUSTER *cluster)
 void
 cluster_rdlock_(CLUSTER *cluster)
 {
+	(void) cluster;
+
+#ifdef WITH_PTHREAD
 	pthread_rwlock_rdlock(&(cluster->lock));
+#endif
 }
 
 /* Write-lock the cluster so that the object's contents can be inspected
@@ -518,13 +538,21 @@ cluster_rdlock_(CLUSTER *cluster)
 void
 cluster_wrlock_(CLUSTER *cluster)
 {
+	(void) cluster;
+
+#ifdef WITH_PTHREAD
 	pthread_rwlock_wrlock(&(cluster->lock));
+#endif
 }
 
 /* Unlock a locked cluster */
 void
 cluster_unlock_(CLUSTER *cluster)
 {
+	(void) cluster;
+
+#ifdef WITH_PTHREAD
 	pthread_rwlock_unlock(&(cluster->lock));
+#endif
 }
 

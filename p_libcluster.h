@@ -40,7 +40,10 @@
 #  include <uuid/uuid.h>
 # endif
 
-# include "libetcd.h"
+# ifdef ENABLE_ETCD
+#  include "libetcd.h"
+# endif
+
 # include "libcluster.h"
 
 /* Default environment name, overridden with cluster_set_env() */
@@ -82,16 +85,18 @@ struct cluster_struct
 	/* Callbacks */
 	void (*logger)(int priority, const char *format, va_list ap);
 	CLUSTERBALANCE balancer;
+# ifdef ENABLE_ETCD
 	/* etcd-based clustering */
 	ETCD *etcd_root;
 	ETCD *etcd_clusterdir;
 	ETCD *etcd_envdir;
-# ifdef WITH_PTHREAD
+#  ifdef WITH_PTHREAD
 	pthread_t ping_thread;
 	pthread_t balancer_thread;
-# endif
+#  endif
 	int etcd_ttl;
 	int etcd_refresh;
+# endif /*ENABLE_ETCD*/
 };
 
 void cluster_logf_(CLUSTER *cluster, int priority, const char *format, ...);
