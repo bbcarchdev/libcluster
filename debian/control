@@ -3,6 +3,7 @@ Section: net
 Priority: extra
 Maintainer: Mo McRoberts <mo.mcroberts@bbc.co.uk>
 Build-Depends: debhelper (>= 8.0.0), liburi-dev, uuid-dev, libjansson-dev, libcurl4-openssl-dev, pkg-config, automake, autoconf, libtool
+Standards-Version: 3.9.3
 
 Package: libcluster
 Architecture: any
