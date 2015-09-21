@@ -12,5 +12,5 @@ Description: Application cluster support library
 
 Package: libcluster-dev
 Architecture: any
-Depends: ${misc:Depends}, liburi-dev, uuid-dev, libjansson-dev, libcurl-dev
+Depends: ${misc:Depends}, libcluster, liburi-dev, uuid-dev, libjansson-dev, libcurl-dev
 Description: Application cluster support library (development files)
