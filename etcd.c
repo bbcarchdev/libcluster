@@ -154,7 +154,7 @@ cluster_etcd_ping_(CLUSTER *cluster, ETCDFLAGS flags)
 	char buf[64];
 	
 	snprintf(buf, sizeof(buf) - 1, "%d", cluster->inst_threads);
-	return etcd_key_set_ttl(cluster->etcd_envdir, cluster->instid, buf, cluster->etcd_ttl, flags);
+	return etcd_key_set_ttl(cluster->etcd_envdir, cluster->instid, buf, cluster->ttl, flags);
 }
 
 /* 'Un-ping' - that is, remove our entry from the directory.
@@ -249,7 +249,7 @@ cluster_etcd_balance_(CLUSTER *cluster)
 	return 0;
 }
 
-/* Periodic ping thread: periodically (every cluster->etcd_refresh seconds)
+/* Periodic ping thread: periodically (every cluster->refresh seconds)
  * ping the registry service until cluster->flags & CF_LEAVING is set.
  */
 static void *
@@ -262,9 +262,9 @@ cluster_etcd_ping_thread_(void *arg)
 
 	cluster_rdlock_(cluster);
 	verbose = (cluster->flags & CF_VERBOSE);
-	refresh = cluster->etcd_refresh;
+	refresh = cluster->refresh;
 	count = refresh;
-	cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: etcd: ping thread starting with ttl=%d, refresh=%d\n", cluster->etcd_ttl, cluster->etcd_refresh);
+	cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: etcd: ping thread starting with ttl=%d, refresh=%d\n", cluster->ttl, cluster->refresh);
 	cluster_unlock_(cluster);
 
 	/* The cluster lock is not held at the start of each pass */

@@ -72,10 +72,8 @@ cluster_create(const char *key)
 		cluster_destroy(p);
 		return NULL;
 	}
-#ifdef ENABLE_ETCD
-	p->etcd_ttl = CLUSTER_DEFAULT_TTL;
-	p->etcd_refresh = CLUSTER_DEFAULT_REFRESH;
-#endif
+	p->ttl = CLUSTER_DEFAULT_TTL;
+	p->refresh = CLUSTER_DEFAULT_REFRESH;
 	return p;
 }
 
@@ -122,10 +120,17 @@ cluster_join(CLUSTER *cluster)
 	case CT_ETCD:
 		return cluster_etcd_join_(cluster);
 #endif
+#ifdef ENABLE_SQL
+	case CT_SQL:
+		return cluster_sql_join_(cluster);
+#endif
 	default:
 		break;
 	}
-	return 0;
+	cluster_logf_locked_(cluster, LOG_CRIT, "libcluster: cannot join cluster type <%d> which is not implemented\n", type);
+	cluster_unlock_(cluster);
+	errno = EPERM;
+	return -1;
 }
 
 /* Leave a cluster (will block until any threads have been terminated) */
@@ -149,6 +154,10 @@ cluster_leave(CLUSTER *cluster)
 #ifdef ENABLE_ETCD
 	case CT_ETCD:
 		return cluster_etcd_leave_(cluster);
+#endif
+#ifdef ENABLE_SQL
+	case CT_SQL:
+		return cluster_sql_leave_(cluster);
 #endif
 	default:
 		break;
@@ -400,6 +409,38 @@ cluster_set_registry(CLUSTER *cluster, const char *uri)
 		cluster_unlock_(cluster);
 		return 0;
 	}
+#ifdef ENABLE_SQL
+	{
+		const char *t;
+		char scheme[64], *p;
+
+		t = strchr(uri, ':');
+		if(t && (t - uri) < 63)
+		{
+			strncpy(scheme, uri, t - uri);
+			scheme[t - uri] = 0;
+			if(sql_scheme_exists(scheme))
+			{
+				p = strdup(uri);
+				if(!p)
+				{
+					cluster_logf_locked_(cluster, LOG_CRIT, "libcluster: failed to duplicate registry URI\n");
+					cluster_unlock_(cluster);
+					return -1;
+				}
+				free(cluster->registry);
+				cluster->registry = p;
+				cluster->type = CT_SQL;
+				if(cluster->flags & CF_VERBOSE)
+				{
+					cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: cluster type set to 'SQL' with database <%s>\n", cluster->registry);
+				}
+				cluster_unlock_(cluster);
+				return 0;
+			}
+		}
+	}
+#endif /*ENABLE_SQL*/
 #ifdef ENABLE_ETCD
 	if(!strncmp(uri, "http:", 5))
 	{

@@ -44,7 +44,7 @@ AM_CPPFLAGS = @AM_CPPFLAGS@ @CPPFLAGS@ @LIBUUID_CPPFLAGS@ \
 
 libcluster_la_SOURCES = libcluster.h \
 	p_libcluster.h \
-	cluster.c static.c etcd.c
+	cluster.c static.c etcd.c sql.c
 
 libcluster_la_LDFLAGS = @AM_LDFLAGS@ \
 	@LIBURI_LDFLAGS@ \

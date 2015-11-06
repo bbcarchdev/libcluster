@@ -40,6 +40,10 @@
 #  include <uuid/uuid.h>
 # endif
 
+# ifdef ENABLE_SQL
+#  include <libsql.h>
+# endif
+
 # ifdef ENABLE_ETCD
 #  include "libetcd.h"
 # endif
@@ -91,7 +95,8 @@
 typedef enum
 {
 	CT_STATIC,
-	CT_ETCD
+	CT_ETCD,
+	CT_SQL
 } CLUSTERTYPE;
 
 typedef enum
@@ -122,18 +127,24 @@ struct cluster_struct
 	void (*logger)(int priority, const char *format, va_list ap);
 # endif
 	CLUSTERBALANCE balancer;
+# if defined(ENABLE_ETCD) || defined(ENABLE_SQL)
+	int ttl;
+	int refresh;
+# endif
 # ifdef ENABLE_ETCD
 	/* etcd-based clustering */
 	ETCD *etcd_root;
 	ETCD *etcd_clusterdir;
 	ETCD *etcd_envdir;
-#  ifdef WITH_PTHREAD
+# endif /*ENABLE_ETCD*/
+# ifdef ENABLE_SQL
+	SQL *pingdb;
+	SQL *balancedb;
+# endif /*ENABLE_SQL*/
+# ifdef WITH_PTHREAD
 	pthread_t ping_thread;
 	pthread_t balancer_thread;
-#  endif
-	int etcd_ttl;
-	int etcd_refresh;
-# endif /*ENABLE_ETCD*/
+# endif /*WITH_PTHREAD*/
 };
 
 void cluster_logf_(CLUSTER *cluster, int priority, const char *format, ...);
@@ -162,8 +173,15 @@ int cluster_rebalanced_(CLUSTER *cluster);
 int cluster_static_join_(CLUSTER *cluster);
 int cluster_static_leave_(CLUSTER *cluster);
 
+# ifdef ENABLE_ETCD
 int cluster_etcd_join_(CLUSTER *cluster);
 int cluster_etcd_leave_(CLUSTER *cluster);
+# endif
+
+# ifdef ENABLE_SQL
+int cluster_sql_join_(CLUSTER *cluster);
+int cluster_sql_leave_(CLUSTER *cluster);
+# endif
 
 /* Deprecated public methods retained for binary compatibility */
 int cluster_set_threads(CLUSTER *cluster, int nthreads);

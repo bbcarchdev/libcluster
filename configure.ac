@@ -68,6 +68,13 @@ if test x"$enable_etcd" = x"yes" ; then
 	convenience_libs="$convenience_libs \${top_builddir}/libetcd/libetcd.la"
 fi
 
+AC_ARG_ENABLE([sql],[AS_HELP_STRING([disable-sql],[disable SQL database support])],[enable_sql=$enableval],[enable_sql=yes])
+AM_CONDITIONAL([ENABLE_SQL],[test x"$enable_sql" = x"yes"])
+if test x"$enable_sql" = x"yes" ; then
+	need_libsql=yes
+	need_liburi=yes
+fi
+
 dnl Feature dependencies
 test x"$enable_pthreads" = x"yes" && need_pthreads=yes
 
@@ -83,9 +90,15 @@ if test x"$enable_etcd" = x"yes" ; then
 	AC_DEFINE_UNQUOTED([ENABLE_ETCD],[1],[define to 1 to build with etcd support])
 fi
 
+if test x"$enable_sql" = x"yes" ; then
+	AC_DEFINE_UNQUOTED([ENABLE_SQL],[1],[define to 1 to build with SQL database support])
+fi
+
 dnl Feature summaries
 AC_MSG_CHECKING([whether to build with etcd support])
 AC_MSG_RESULT([$enable_etcd])
+AC_MSG_CHECKING([whether to build with SQL database support])
+AC_MSG_RESULT([$enable_sql])
 AC_MSG_CHECKING([whether to build with POSIX threads support])
 AC_MSG_RESULT([$enable_pthreads])
 AC_MSG_CHECKING([whether to build with logging callbacks])
@@ -115,9 +128,13 @@ if test x"$need_libuuid" = x"yes" ; then
 	BT_REQUIRE_LIBUUID
 fi
 
-dnl Always check for liburi last because it may be not-yet-installed
+dnl Always check for possibly-uninstalled libraries last
 if test x"$need_liburi" = x"yes" ; then
 	BT_REQUIRE_LIBURI_INCLUDED
+fi
+
+if test x"$need_libsql" = x"yes" ; then
+   BT_REQUIRE_LIBSQL
 fi
 
 AC_SUBST([convenience_libs])
