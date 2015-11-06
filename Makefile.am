@@ -54,3 +54,17 @@ libcluster_la_LIBADD = \
 	@convenience_libs@ @LOCAL_LIBS@ @LIBS@
 
 cluster_test_LDADD = libcluster.la
+
+BRANCH ?= develop
+
+DEVELOP_SUBMODULES = m4
+
+checkout:
+	@for submod in $(DEVELOP_SUBMODULES) ; do \
+		echo "+++ Checking out the latest version of $$submod on $(BRANCH)" >&2 ; \
+		cd $$submod && \
+		git checkout $(BRANCH) && \
+		git pull && \
+		$(MAKE) checkout BRANCH=$(BRANCH) || exit $? && \
+		cd .. ; \
+	done
