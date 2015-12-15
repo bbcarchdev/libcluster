@@ -226,6 +226,7 @@ cluster_sql_balance_(CLUSTER *cluster)
 	rs = sql_queryf(cluster->balancedb, "SELECT \"id\", \"threads\" FROM \"cluster_node\" WHERE \"key\" = %Q AND \"env\" = %Q AND \"expires\" >= %Q ORDER BY \"id\" ASC",
 					cluster->key, cluster->env, nowbuf);
 	total = 0;
+	base = -1;
 	for(; !sql_stmt_eof(rs); sql_stmt_next(rs))
 	{
 		id = sql_stmt_str(rs, 0);
@@ -252,11 +253,11 @@ cluster_sql_balance_(CLUSTER *cluster)
 	{
 		if(base == -1)
 		{
-			cluster_logf_locked_(cluster, LOG_NOTICE, "libcluster: SQL: this instance is no longer a member of %s/%s\n", cluster->key, cluster->env);			
+			cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: SQL: this instance is no longer a member of %s/%s\n", cluster->key, cluster->env);			
 		}
 		else
 		{
-			cluster_logf_locked_(cluster, LOG_NOTICE, "libcluster: SQL: cluster %s/%s has re-balanced: new base is %d (was %d), new total is %d (was %d)\n", cluster->key, cluster->env, base, cluster->inst_index, total, cluster->total_threads);
+			cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: SQL: cluster %s/%s has re-balanced: new base is %d (was %d), new total is %d (was %d)\n", cluster->key, cluster->env, base, cluster->inst_index, total, cluster->total_threads);
 		}
 		cluster->inst_index = base;
 		cluster->total_threads = total;
