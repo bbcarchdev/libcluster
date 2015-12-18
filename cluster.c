@@ -72,8 +72,10 @@ cluster_create(const char *key)
 		cluster_destroy(p);
 		return NULL;
 	}
+# if defined(ENABLE_ETCD) || defined(ENABLE_SQL)
 	p->ttl = CLUSTER_DEFAULT_TTL;
 	p->refresh = CLUSTER_DEFAULT_REFRESH;
+# endif
 	return p;
 }
 
