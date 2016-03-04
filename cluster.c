@@ -26,8 +26,10 @@ CLUSTER *
 cluster_create(const char *key)
 {
 	CLUSTER *p;
+# ifdef WITH_LIBUUID
 	uuid_t uuid;
 	char uuidbuf[40], *s;
+# endif
 	const char *t;
 
 	p = (CLUSTER *) calloc(1, sizeof(CLUSTER));
@@ -46,6 +48,7 @@ cluster_create(const char *key)
 		cluster_destroy(p);
 		return NULL;
 	}
+# ifdef WITH_LIBUUID
 	uuid_generate(uuid);
 	uuid_unparse_lower(uuid, uuidbuf);
 	s = p->instid;
@@ -58,6 +61,7 @@ cluster_create(const char *key)
 		}
 	}
 	*s = 0;
+# endif
 	p->key = strdup(key);
 	if(!p->key)
 	{
@@ -72,8 +76,10 @@ cluster_create(const char *key)
 		cluster_destroy(p);
 		return NULL;
 	}
+# if defined(ENABLE_ETCD) || defined(ENABLE_SQL)
 	p->ttl = CLUSTER_DEFAULT_TTL;
 	p->refresh = CLUSTER_DEFAULT_REFRESH;
+# endif
 	return p;
 }
 
