@@ -118,6 +118,7 @@ struct cluster_struct
 	char *key;
 	char *env;
 	char *registry;
+	char *partition;
 	/* Current state */
 	int inst_index;
 	int inst_threads;
@@ -135,6 +136,7 @@ struct cluster_struct
 	/* etcd-based clustering */
 	ETCD *etcd_root;
 	ETCD *etcd_clusterdir;
+	ETCD *etcd_partitiondir;
 	ETCD *etcd_envdir;
 # endif /*ENABLE_ETCD*/
 # ifdef ENABLE_SQL

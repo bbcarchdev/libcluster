@@ -1,6 +1,6 @@
 /* Author: Mo McRoberts <mo.mcroberts@bbc.co.uk>
  *
- * Copyright (c) 2015 BBC
+ * Copyright (c) 2015-2016 BBC
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -93,6 +93,7 @@ cluster_destroy(CLUSTER *cluster)
 	free(cluster->key);
 	free(cluster->env);
 	free(cluster->registry);
+	free(cluster->partition);
 	cluster_unlock_(cluster);
 #ifdef WITH_PTHREAD
 	pthread_rwlock_destroy(&(cluster->lock));
@@ -499,6 +500,64 @@ int
 cluster_set_threads(CLUSTER *cluster, int nthreads)
 {
 	return cluster_set_workers(cluster, nthreads);
+}
+
+/* Retrieve the partition this member is part of (if any) */
+/* MT-safety: safe provided barriered against cluster_set_partition() or
+ *            cluster_destroy()
+ */
+const char *
+cluster_partition(CLUSTER *cluster)
+{
+	errno = 0;
+	return cluster->partition;
+}
+
+/* Set the partition that this member is part of (cannot be invoked after the
+ * cluster has been joined)
+ */
+int
+cluster_set_partition(CLUSTER *cluster, const char *partition)
+{
+	char *p;
+
+   	cluster_wrlock_(cluster);
+	if(cluster->flags & CF_JOINED)
+	{
+		cluster_logf_locked_(cluster, LOG_NOTICE, "libcluster: cannot alter cluster parameters while joined\n");
+		cluster_unlock_(cluster);
+		errno = EPERM;
+		return -1;
+	}
+	if(partition)
+	{
+		p = strdup(partition);
+		if(!p)
+		{
+			cluster_logf_locked_(cluster, LOG_CRIT, "libcluster: failed to duplicate partition name\n");
+			cluster_unlock_(cluster);
+			return -1;
+		}
+	}
+	else
+	{
+		p = NULL;
+	}
+	free(cluster->partition);
+	cluster->partition = p;
+	if(cluster->flags & CF_VERBOSE)
+	{
+		if(p)
+		{
+			cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: partition set '%s'\n", p);
+		}
+		else
+		{
+			cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: instance is not part of a partition\n");
+		}
+	}
+	cluster_unlock_(cluster);
+	return 0;
 }
 
 /* Log a message when the cluster is already locked */

@@ -1,6 +1,6 @@
 /* Author: Mo McRoberts <mo.mcroberts@bbc.co.uk>
  *
- * Copyright (c) 2015 BBC
+ * Copyright (c) 2015-2016 BBC
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -70,6 +70,7 @@ usage(void)
 		   "  -v                        Be more verbose\n"
 		   "  -k KEY                    Set the cluster key to KEY\n"
 		   "  -e ENV                    Set the cluster environment to ENV\n"
+		   "  -p NAME                   Set the instance partition to NAME\n"
 		   "  -i ID                     Set the instance identifier to ID\n"
 		   "  -n COUNT                  Set the number of workers to COUNT\n"
 		   " etcd-based clustering:\n"
@@ -89,13 +90,14 @@ main(int argc, char **argv)
 	const char *env = NULL;
 	const char *registry = NULL;
 	const char *instid = NULL;
+	const char *partition = NULL;
 	int nworkers = 0, instindex = 0, total = 0, verbose = 0;
 	CLUSTER *cluster;
 
 	t = strrchr(argv[0], '/');
 	short_program_name = (t ? t + 1 : argv[0]);
 	
-	while((c = getopt(argc, argv, "hvk:e:i:n:r:I:T:")) != -1)
+	while((c = getopt(argc, argv, "hvk:e:i:n:r:I:T:p:")) != -1)
 	{
 		switch(c)
 		{
@@ -126,6 +128,9 @@ main(int argc, char **argv)
 		case 'T':
 			total = atoi(optarg);
 			break;
+		case 'p':
+			partition = optarg;
+			break;
 		default:
 			usage();
 			exit(EXIT_FAILURE);
@@ -140,6 +145,7 @@ main(int argc, char **argv)
 	cluster_set_logger(cluster, logger);
 	cluster_set_balancer(cluster, balancer);
 	cluster_set_verbose(cluster, verbose);
+	cluster_set_partition(cluster, partition);
 	if(env)
 	{
 		cluster_set_env(cluster, env);
@@ -163,7 +169,7 @@ main(int argc, char **argv)
 	if(total)
 	{
 		cluster_static_set_total(cluster, total);
-	}   
+	}
 	signal(SIGINT, inthandler);
 	if(cluster_join(cluster))
 	{

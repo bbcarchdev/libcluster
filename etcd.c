@@ -1,6 +1,6 @@
 /* Author: Mo McRoberts <mo.mcroberts@bbc.co.uk>
  *
- * Copyright (c) 2015 BBC
+ * Copyright (c) 2015-2016 BBC
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -40,6 +40,8 @@ static int cluster_etcd_sort_(const void *ptra, const void *ptrb);
 int
 cluster_etcd_join_(CLUSTER *cluster)
 {	
+	ETCD *parent;
+
 	cluster_wrlock_(cluster);
 	cluster->inst_index = -1;
 	cluster->etcd_root = etcd_connect(cluster->registry);
@@ -63,10 +65,30 @@ cluster_etcd_join_(CLUSTER *cluster)
 			return -1;
 		}
 	}
-	cluster->etcd_envdir = etcd_dir_create(cluster->etcd_clusterdir, cluster->env, ETCD_NONE);
+	if(cluster->partition)
+	{
+		cluster->etcd_partitiondir = etcd_dir_create(cluster->etcd_clusterdir, cluster->partition, ETCD_NONE);
+		if(!cluster->etcd_partitiondir)
+		{
+			cluster->etcd_partitiondir = etcd_dir_open(cluster->etcd_clusterdir, cluster->partition);
+			if(!cluster->etcd_partitiondir)
+			{
+				cluster_logf_locked_(cluster, LOG_CRIT, "libcluster: etcd: failed to create or open registry directory for partition '%s/%s'\n", cluster->key, cluster->partition);
+				cluster_unlock_(cluster);
+				cluster_etcd_leave_(cluster);
+				return -1;
+			}
+		}
+		parent = cluster->etcd_partitiondir;
+	}
+	else	
+	{
+		parent = cluster->etcd_clusterdir;
+	}
+	cluster->etcd_envdir = etcd_dir_create(parent, cluster->env, ETCD_NONE);
 	if(!cluster->etcd_envdir)
 	{
-		cluster->etcd_envdir = etcd_dir_open(cluster->etcd_clusterdir, cluster->env);
+		cluster->etcd_envdir = etcd_dir_open(parent, cluster->env);
 		if(!cluster->etcd_envdir)
 		{
 			cluster_logf_locked_(cluster, LOG_CRIT, "libcluster: etcd: failed to create or open registry directory for environment '%s/%s'\n", cluster->key, cluster->env);
@@ -125,6 +147,11 @@ cluster_etcd_leave_(CLUSTER *cluster)
 	{
 		etcd_dir_close(cluster->etcd_envdir);
 		cluster->etcd_envdir = NULL;
+	}
+	if(cluster->etcd_partitiondir)
+	{
+		etcd_dir_close(cluster->etcd_partitiondir);
+		cluster->etcd_partitiondir = NULL;
 	}
 	if(cluster->etcd_clusterdir)
 	{
@@ -195,7 +222,14 @@ cluster_etcd_balance_(CLUSTER *cluster)
 	total = 0;
 	if(cluster->flags & CF_VERBOSE)
 	{
-		cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: etcd: re-balancing cluster %s/%s:\n", cluster->key, cluster->env);
+		if(cluster->partition)
+		{
+			cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: etcd: re-balancing cluster %s[%s]/%s:\n", cluster->key, cluster->partition, cluster->env);
+		}
+		else
+		{
+			cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: etcd: re-balancing cluster %s/%s:\n", cluster->key, cluster->env);
+		}			
 	}
 	for(n = 0; keys[n]; n++)
 	{
@@ -233,11 +267,25 @@ cluster_etcd_balance_(CLUSTER *cluster)
 	{
 		if(base == -1)
 		{
-			cluster_logf_locked_(cluster, LOG_NOTICE, "libcluster: etcd: this instance is no longer a member of %s/%s\n", cluster->key, cluster->env);			
+			if(cluster->partition)
+			{
+				cluster_logf_locked_(cluster, LOG_NOTICE, "libcluster: etcd: this instance is no longer a member of %s[%s]/%s\n", cluster->key, cluster->partition, cluster->env);
+			}
+			else
+			{
+				cluster_logf_locked_(cluster, LOG_NOTICE, "libcluster: etcd: this instance is no longer a member of %s/%s\n", cluster->key, cluster->env);
+			}
 		}
 		else
 		{
-			cluster_logf_locked_(cluster, LOG_NOTICE, "libcluster: etcd: cluster %s/%s has re-balanced: new base is %d (was %d), new total is %d (was %d)\n", cluster->key, cluster->env, base, cluster->inst_index, total, cluster->total_threads);
+			if(cluster->partition)
+			{
+				cluster_logf_locked_(cluster, LOG_NOTICE, "libcluster: etcd: cluster %s[%s]/%s has re-balanced: new base is %d (was %d), new total is %d (was %d)\n", cluster->key, cluster->partition, cluster->env, base, cluster->inst_index, total, cluster->total_threads);
+			}
+			else
+			{
+				cluster_logf_locked_(cluster, LOG_NOTICE, "libcluster: etcd: cluster %s/%s has re-balanced: new base is %d (was %d), new total is %d (was %d)\n", cluster->key, cluster->env, base, cluster->inst_index, total, cluster->total_threads);
+			}
 		}
 		cluster->inst_index = base;
 		cluster->total_threads = total;
@@ -331,10 +379,17 @@ cluster_etcd_balancer_thread_(void *arg)
 	cluster_rdlock_(cluster);
 	verbose = (cluster->flags & CF_VERBOSE);
 	dir = etcd_clone(cluster->etcd_envdir);
-	cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: etcd: re-balancing thread started for %s/%s at <%s>\n", cluster->key, cluster->env, cluster->registry);
+	if(cluster->partition)
+	{
+		cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: etcd: re-balancing thread started for %s[%s]/%s at <%s>\n", cluster->key, cluster->partition, cluster->env, cluster->registry);
+	}
+	else
+	{
+		cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: etcd: re-balancing thread started for %s/%s at <%s>\n", cluster->key, cluster->env, cluster->registry);
+	}
 	cluster_unlock_(cluster);
 
-	/* The cluster lock is not held at the start of each pass */	
+	/* The cluster lock is not held at the start of each pass */
 	for(;;)
 	{
 		r = 0;
@@ -349,7 +404,14 @@ cluster_etcd_balancer_thread_(void *arg)
 		}
 		if(verbose)
 		{
-			cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: etcd: waiting for changes to %s/%s\n", cluster->key, cluster->env);
+			if(cluster->partition)
+			{
+				cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: etcd: waiting for changes to %s[%s]/%s\n", cluster->key, cluster->partition, cluster->env);
+			}
+			else
+			{
+				cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: etcd: waiting for changes to %s/%s\n", cluster->key, cluster->env);
+			}
 		}
 		/* Wait for changes to the directory; we must release the acquired
 		 * read lock while we do this (or the ping thread will be

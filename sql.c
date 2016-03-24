@@ -1,6 +1,6 @@
 /* Author: Mo McRoberts <mo.mcroberts@bbc.co.uk>
  *
- * Copyright (c) 2015 BBC
+ * Copyright (c) 2015-2016 BBC
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@
 
 #ifdef ENABLE_SQL
 
-# define CLUSTER_SQL_SCHEMA_VERSION     4
+# define CLUSTER_SQL_SCHEMA_VERSION     5
 # define CLUSTER_SQL_BALANCE_SLEEP      5
 # define CLUSTER_SQL_MAX_BALANCEWAIT    30
 
@@ -177,9 +177,9 @@ cluster_sql_perform_ping_(SQL *restrict sql, void *restrict userdata)
 	gmtime_r(&t, &tm);
 	strftime(expbuf, sizeof(expbuf) -1, "%Y-%m-%d %H:%M:%S", &tm);
 
-	if(sql_executef(sql, "INSERT INTO \"cluster_node\" (\"id\", \"key\", \"env\", \"threads\", \"updated\", \"expires\") VALUES (%Q, %Q, %Q, %d, %Q, %Q)",
-					cluster->instid, cluster->key, cluster->env,
-					cluster->inst_threads, nowbuf, expbuf))
+	if(sql_executef(sql, "INSERT INTO \"cluster_node\" (\"id\", \"key\", \"partition\", \"env\", \"threads\", \"updated\", \"expires\") VALUES (%Q, %Q, %Q, %Q, %d, %Q, %Q)",
+					cluster->instid, cluster->key, cluster->partition,
+					cluster->env, cluster->inst_threads, nowbuf, expbuf))
 	{
 		return -1;
 	}
@@ -223,8 +223,16 @@ cluster_sql_balance_(CLUSTER *cluster)
 	now = time(NULL);
 	gmtime_r(&now, &tm);
 	strftime(nowbuf, sizeof(nowbuf) - 1, "%Y-%m-%d %H:%M:%S", &tm);
-	rs = sql_queryf(cluster->balancedb, "SELECT \"id\", \"threads\" FROM \"cluster_node\" WHERE \"key\" = %Q AND \"env\" = %Q AND \"expires\" >= %Q ORDER BY \"id\" ASC",
-					cluster->key, cluster->env, nowbuf);
+	if(cluster->partition)
+	{
+		rs = sql_queryf(cluster->balancedb, "SELECT \"id\", \"threads\" FROM \"cluster_node\" WHERE \"key\" = %Q AND \"env\" = %Q AND \"partition\" = %Q AND \"expires\" >= %Q ORDER BY \"id\" ASC",
+						cluster->key, cluster->env, cluster->partition, nowbuf);
+	}
+	else
+	{
+		rs = sql_queryf(cluster->balancedb, "SELECT \"id\", \"threads\" FROM \"cluster_node\" WHERE \"key\" = %Q AND \"env\" = %Q AND \"partition\" IS NULL AND \"expires\" >= %Q ORDER BY \"id\" ASC",
+						cluster->key, cluster->env, nowbuf);
+	}
 	total = 0;
 	base = -1;
 	for(; !sql_stmt_eof(rs); sql_stmt_next(rs))
@@ -253,11 +261,25 @@ cluster_sql_balance_(CLUSTER *cluster)
 	{
 		if(base == -1)
 		{
-			cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: SQL: this instance is no longer a member of %s/%s\n", cluster->key, cluster->env);			
+			if(cluster->partition)
+			{
+				cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: SQL: this instance is no longer a member of %s[%s]/%s\n", cluster->key, cluster->partition, cluster->env);
+			}
+			else
+			{
+				cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: SQL: this instance is no longer a member of %s/%s\n", cluster->key, cluster->env);
+			}
 		}
 		else
 		{
-			cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: SQL: cluster %s/%s has re-balanced: new base is %d (was %d), new total is %d (was %d)\n", cluster->key, cluster->env, base, cluster->inst_index, total, cluster->total_threads);
+			if(cluster->partition)
+			{
+				cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: SQL: cluster %s[%s]/%s has re-balanced: new base is %d (was %d), new total is %d (was %d)\n", cluster->key, cluster->partition, cluster->env, base, cluster->inst_index, total, cluster->total_threads);
+			}
+			else
+			{
+				cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: SQL: cluster %s/%s has re-balanced: new base is %d (was %d), new total is %d (was %d)\n", cluster->key, cluster->env, base, cluster->inst_index, total, cluster->total_threads);
+			}		
 		}
 		cluster->inst_index = base;
 		cluster->total_threads = total;
@@ -355,7 +377,14 @@ cluster_sql_balancer_thread_(void *arg)
 	cluster = (CLUSTER *) arg;
 	cluster_rdlock_(cluster);
 	verbose = (cluster->flags & CF_VERBOSE);
-	cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: SQL: re-balancing thread started for %s/%s\n", cluster->key, cluster->env);
+	if(cluster->partition)
+	{
+		cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: SQL: re-balancing thread started for %s[%s]/%s\n", cluster->key, cluster->partition, cluster->env);
+	}
+	else
+	{
+		cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: SQL: re-balancing thread started for %s/%s\n", cluster->key, cluster->env);
+	}
 	cluster_unlock_(cluster);
 
 	/* The cluster lock is not held at the start of each pass */	
@@ -372,7 +401,14 @@ cluster_sql_balancer_thread_(void *arg)
 		}
 		if(verbose)
 		{
-			cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: SQL: waiting for changes to %s/%s\n", cluster->key, cluster->env);
+			if(cluster->partition)
+			{
+				cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: SQL: waiting for changes to %s[%s]/%s\n", cluster->key, cluster->partition, cluster->env);
+			}
+			else
+			{
+				cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: SQL: waiting for changes to %s/%s\n", cluster->key, cluster->env);
+			}
 		}
 		/* Check for changes to the table; we must release the acquired
 		 * read lock while we do this (or the ping thread will be
@@ -385,13 +421,30 @@ cluster_sql_balancer_thread_(void *arg)
 		strftime(nowbuf, sizeof(nowbuf) - 1, "%Y-%m-%d %H:%M:%S", &tm);
 		if(lastbuf[0])
 		{
-			rs = sql_queryf(cluster->balancedb, "SELECT \"id\", \"threads\" FROM \"cluster_node\" WHERE \"key\" = %Q AND \"env\" = %Q AND \"expires\" >= %Q AND \"updated\" >= %Q",
+			if(cluster->partition)
+			{
+				rs = sql_queryf(cluster->balancedb, "SELECT \"id\", \"threads\" FROM \"cluster_node\" WHERE \"key\" = %Q AND \"env\" = %Q AND \"partition\" = %Q AND \"expires\" >= %Q AND \"updated\" >= %Q",
+								cluster->key, cluster->env, cluster->partition, nowbuf, lastbuf);
+			}
+			else
+			{
+				rs = sql_queryf(cluster->balancedb, "SELECT \"id\", \"threads\" FROM \"cluster_node\" WHERE \"key\" = %Q AND \"env\" = %Q AND \"partition\" IS NULL AND \"expires\" >= %Q AND \"updated\" >= %Q",
 							cluster->key, cluster->env, nowbuf, lastbuf);
+			}
 		}
 		else
 		{
-			rs = sql_queryf(cluster->balancedb, "SELECT \"id\", \"threads\" FROM \"cluster_node\" WHERE \"key\" = %Q AND \"env\" = %Q AND \"expires\" >= %Q",
-							cluster->key, cluster->env, nowbuf);
+			if(cluster->partition)
+			{
+				rs = sql_queryf(cluster->balancedb, "SELECT \"id\", \"threads\" FROM \"cluster_node\" WHERE \"key\" = %Q AND \"env\" = %Q AND \"partition\" = %Q AND \"expires\" >= %Q",
+								cluster->key, cluster->env, cluster->partition, nowbuf);
+
+			}
+			else
+			{
+				rs = sql_queryf(cluster->balancedb, "SELECT \"id\", \"threads\" FROM \"cluster_node\" WHERE \"key\" = %Q AND \"env\" = %Q AND \"partition\" IS NULL AND \"expires\" >= %Q",
+								cluster->key, cluster->env, nowbuf);
+			}
 		}
 		strcpy(lastbuf, nowbuf);
 		if(sql_stmt_eof(rs) && now - last < CLUSTER_SQL_MAX_BALANCEWAIT)
@@ -487,6 +540,18 @@ cluster_sql_migrate_(SQL *restrict sql, const char *restrict identifier, int new
 	if(newversion == 4)
 	{
 		if(sql_execute(sql, "CREATE INDEX \"cluster_node_updated\" ON \"cluster_node\" (\"updated\")"))
+		{
+			return -1;
+		}
+		return 0;
+	}
+	if(newversion == 5)
+	{
+		if(sql_execute(sql, "ALTER TABLE \"cluster_node\" ADD \"partition\" VARCHAR(32) default NULL"))
+		{
+			return -1;
+		}
+		if(sql_execute(sql, "CREATE INDEX \"cluster_node_partition\" ON \"cluster_node\" (\"partition\")"))
 		{
 			return -1;
 		}

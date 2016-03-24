@@ -1,6 +1,6 @@
 /* Author: Mo McRoberts <mo.mcroberts@bbc.co.uk>
  *
- * Copyright (c) 2015 BBC
+ * Copyright (c) 2015-2016 BBC
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -74,6 +74,17 @@ const char *cluster_instance(CLUSTER *cluster);
 
 /* Set the unique member instance identifer of this cluster member */
 int cluster_set_instance(CLUSTER *cluster, const char *instid);
+
+/* Retrieve the partition this member is part of (if any) */
+/* MT-safety: safe provided barriered against cluster_set_partition() or
+ *            cluster_destroy()
+ */
+const char *cluster_partition(CLUSTER *cluster);
+
+/* Set the partition that this member is part of (cannot be invoked after the
+ * cluster has been joined)
+ */
+int cluster_set_partition(CLUSTER *cluster, const char *partition);
 
 /* Get the index of a worker in this cluster member (not valid when not joined)
  * The first worker is 0, the second is 1, ...
