@@ -337,7 +337,6 @@ cluster_etcd_prepare_(CLUSTER *p)
 	p->ping_thread = 0;
 	p->balancer_thread = 0;
 	p->inst_index = -1;
-	p->inst_threads = 0;
 	p->total_threads = 0;
 	cluster_rebalanced_(p);
 	if(p->flags & CF_VERBOSE)
@@ -345,7 +344,6 @@ cluster_etcd_prepare_(CLUSTER *p)
 		cluster_logf_locked_(p, LOG_INFO, "libcluster: etcd: threads terminated\n");
 	}
 	p->flags = flags;
-	cluster_unlock_(p);
 }
 
 /* Invoked after fork() in the child process */
@@ -355,6 +353,7 @@ cluster_etcd_child_(CLUSTER *p)
 	int r;
 
 	r = 0;
+	pthread_rwlock_init(&(p->lock), NULL);
 	cluster_wrlock_(p);
 	if(p->forkmode & CLUSTER_FORK_CHILD)
 	{
@@ -363,7 +362,7 @@ cluster_etcd_child_(CLUSTER *p)
 			/* We're re-joining the cluster in both the parent and the child, therefore
 			 * the child will be assigned a new instance UUID
 			 */
-			cluster_reset_instance(p);
+			cluster_reset_instance_locked_(p);
 		}
 		if(p->flags & CF_JOINED)
 		{
@@ -388,7 +387,7 @@ cluster_etcd_parent_(CLUSTER *p)
 	int r;
 
 	r = 0;
-	cluster_wrlock_(p);
+	/* Already locked prior to the fork */
 	if((p->forkmode & CLUSTER_FORK_PARENT) && (p->flags & CF_JOINED))
 	{
 		if(p->flags & CF_VERBOSE)

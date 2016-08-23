@@ -194,6 +194,8 @@ void cluster_sql_child_(CLUSTER *cluster);
 void cluster_sql_parent_(CLUSTER *cluster);
 # endif
 
+int cluster_reset_instance_locked_(CLUSTER *cluster);
+
 /* Deprecated public methods retained for binary compatibility */
 int cluster_set_threads(CLUSTER *cluster, int nthreads);
 

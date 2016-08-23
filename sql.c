@@ -331,7 +331,6 @@ cluster_sql_prepare_(CLUSTER *p)
 	p->ping_thread = 0;
 	p->balancer_thread = 0;
 	p->inst_index = -1;
-	p->inst_threads = 0;
 	p->total_threads = 0;
 	cluster_rebalanced_(p);
 	if(p->flags & CF_VERBOSE)
@@ -339,7 +338,7 @@ cluster_sql_prepare_(CLUSTER *p)
 		cluster_logf_locked_(p, LOG_INFO, "libcluster: SQL: threads terminated\n");
 	}
 	p->flags = flags;
-	cluster_unlock_(p);
+	/* Leave the cluster locked */
 }
 
 void
@@ -347,8 +346,8 @@ cluster_sql_parent_(CLUSTER *p)
 {
 	int r;
 
+	/* The cluster is locked on entry */
 	r = 0;
-	cluster_wrlock_(p);
 	if((p->forkmode & CLUSTER_FORK_PARENT) && (p->flags & CF_JOINED))
 	{
 		if(p->flags & CF_VERBOSE)
@@ -369,8 +368,10 @@ cluster_sql_child_(CLUSTER *p)
 {
 	int r;
 
-	r = 0;
+	/* The cluster was locked by the parent on entry, reset the lock */
+	pthread_rwlock_init(&(p->lock), NULL);
 	cluster_wrlock_(p);
+	r = 0;
 	if(p->forkmode & CLUSTER_FORK_CHILD)
 	{
 		if(p->forkmode & CLUSTER_FORK_PARENT)
@@ -378,7 +379,7 @@ cluster_sql_child_(CLUSTER *p)
 			/* We're re-joining the cluster in both the parent and the child, therefore
 			 * the child will be assigned a new instance UUID
 			 */
-			cluster_reset_instance(p);
+			cluster_reset_instance_locked_(p);
 		}
 		if(p->flags & CF_JOINED)
 		{

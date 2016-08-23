@@ -61,7 +61,7 @@ cluster_create(const char *key)
 #ifdef WITH_PTHREAD
 	pthread_once(&cluster_list_control_, cluster_list_init_);
 	pthread_once(&cluster_fork_control_, cluster_fork_init_);
-	pthread_rwlock_init(&(p->lock), NULL);	
+	pthread_rwlock_init(&(p->lock), NULL);
 #endif
 	p->forkmode = CLUSTER_FORK_CHILD;
 	p->inst_threads = 1;
@@ -361,7 +361,7 @@ cluster_set_instance(CLUSTER *cluster, const char *name)
  * a new UUID to be generated, otherwise it will be set to an empty string.
  */
 int
-cluster_reset_instance(CLUSTER *p)
+cluster_reset_instance_locked_(CLUSTER *p)
 {
 	char *instid;
 # ifdef WITH_LIBUUID
@@ -391,11 +391,20 @@ cluster_reset_instance(CLUSTER *p)
 	}
 	*s = 0;
 # endif
-	cluster_wrlock_(p);
 	free(p->instid);
 	p->instid = instid;
-	cluster_unlock_(p);
 	return 0;
+}
+
+int
+cluster_reset_instance(CLUSTER *p)
+{
+	int r;
+
+	cluster_wrlock_(p);
+	r = cluster_reset_instance_locked_(p);
+	cluster_unlock_(p);
+	return r;
 }
 
 /* Get the index of a worker in this cluster member (not valid when
