@@ -24,6 +24,21 @@ typedef struct cluster_struct CLUSTER;
 typedef struct cluster_state_struct CLUSTERSTATE;
 typedef int (*CLUSTERBALANCE)(CLUSTER *cluster, CLUSTERSTATE *state);
 
+/* Enumeration for how libcluster should behave when the process invokes
+ * fork()
+ */
+typedef enum
+{
+	/* The cluster membership shall be transferred to the child process */
+	CLUSTER_FORK_CHILD = (1<<0),
+	/* The cluster membership shall continue in the parent process */
+	CLUSTER_FORK_PARENT = (1<<1),
+	/* The cluster membership shall continue in both the parent and the child,
+	 * with the child being assigned a new node UUID
+	 */
+	CLUSTER_FORK_BOTH = (1<<2)
+} CLUSTERFORK;
+
 /* A cluster member state structure, passed to the balancing callback when
  * this member's position within the cluster (or the overall size of the
  * cluster) changes.
@@ -75,6 +90,9 @@ const char *cluster_instance(CLUSTER *cluster);
 /* Set the unique member instance identifer of this cluster member */
 int cluster_set_instance(CLUSTER *cluster, const char *instid);
 
+/* Reset the unique member instance identifer of this cluster member */
+int cluster_reset_instance(CLUSTER *cluster);
+
 /* Retrieve the partition this member is part of (if any) */
 /* MT-safety: safe provided barriered against cluster_set_partition() or
  *            cluster_destroy()
@@ -110,6 +128,9 @@ int cluster_set_logger(CLUSTER *cluster, void (*logger)(int priority, const char
  * has changed
  */
 int cluster_set_balancer(CLUSTER *cluster, CLUSTERBALANCE callback);
+
+/* Set the fork behaviour (default is CLUSTER_FORK_CHILD) */
+int cluster_set_fork(CLUSTER *cluster, CLUSTERFORK mode);
 
 /** Static clustering support **/
 

@@ -109,8 +109,11 @@ typedef enum
 
 struct cluster_struct
 {
+	CLUSTER *next;
+	CLUSTER *prev;
 	CLUSTERTYPE type;
 	CLUSTERFLAGS flags;
+	CLUSTERFORK forkmode;
 # ifdef WITH_PTHREAD
 	pthread_rwlock_t lock;
 # endif
@@ -178,11 +181,17 @@ int cluster_static_leave_(CLUSTER *cluster);
 # ifdef ENABLE_ETCD
 int cluster_etcd_join_(CLUSTER *cluster);
 int cluster_etcd_leave_(CLUSTER *cluster);
+void cluster_etcd_prepare_(CLUSTER *cluster);
+void cluster_etcd_child_(CLUSTER *cluster);
+void cluster_etcd_parent_(CLUSTER *cluster);
 # endif
 
 # ifdef ENABLE_SQL
 int cluster_sql_join_(CLUSTER *cluster);
 int cluster_sql_leave_(CLUSTER *cluster);
+void cluster_sql_prepare_(CLUSTER *cluster);
+void cluster_sql_child_(CLUSTER *cluster);
+void cluster_sql_parent_(CLUSTER *cluster);
 # endif
 
 /* Deprecated public methods retained for binary compatibility */

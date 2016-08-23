@@ -68,6 +68,7 @@ usage(void)
 		   "OPTIONS are one or more of:\n"
 		   "  -h                        Print this message and exit\n"
 		   "  -v                        Be more verbose\n"
+		   "  -F                        Fork a child process after joining the cluster\n"
 		   "  -k KEY                    Set the cluster key to KEY\n"
 		   "  -e ENV                    Set the cluster environment to ENV\n"
 		   "  -p NAME                   Set the instance partition to NAME\n"
@@ -91,13 +92,14 @@ main(int argc, char **argv)
 	const char *registry = NULL;
 	const char *instid = NULL;
 	const char *partition = NULL;
-	int nworkers = 0, instindex = 0, total = 0, verbose = 0;
+	int nworkers = 0, instindex = 0, total = 0, verbose = 0, dofork = 0;
+	pid_t child;
 	CLUSTER *cluster;
 
 	t = strrchr(argv[0], '/');
 	short_program_name = (t ? t + 1 : argv[0]);
 	
-	while((c = getopt(argc, argv, "hvk:e:i:n:r:I:T:p:")) != -1)
+	while((c = getopt(argc, argv, "hvFk:e:i:n:r:I:T:p:")) != -1)
 	{
 		switch(c)
 		{
@@ -106,6 +108,9 @@ main(int argc, char **argv)
 			exit(EXIT_SUCCESS);
 		case 'v':
 			verbose = 1;
+			break;
+		case 'F':
+			dofork = 1;
 			break;
 		case 'k':
 			key = optarg;
@@ -176,10 +181,23 @@ main(int argc, char **argv)
 		fprintf(stderr, "%s: failed to join cluster: %s\n", short_program_name, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
+	if(dofork)
+	{
+		child = fork();
+		if(child == -1)
+		{
+			fprintf(stderr, "%s: failed to fork child process: %s\n", short_program_name, strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+		if(child)
+		{
+			exit(EXIT_SUCCESS);
+		}
+	}
 	/* In a real cluster member, the main processing loop (or equivalent)
 	 * would be here. Because this is simply a test of the clustering
 	 * mechanism itself, we just sleep until terminated.
-	 */
+	 */	
 	fprintf(stderr, "%s: cluster joined; sleeping until terminated\n", short_program_name);
 	while(!should_exit)
 	{

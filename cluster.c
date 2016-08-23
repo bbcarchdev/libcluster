@@ -21,6 +21,27 @@
 
 #include "p_libcluster.h"
 
+static CLUSTER *cluster_first_ = NULL;
+static CLUSTER *cluster_last_ = NULL;
+
+#ifdef WITH_PTHREAD
+static pthread_once_t cluster_fork_control_ = PTHREAD_ONCE_INIT;
+
+static pthread_once_t cluster_list_control_ = PTHREAD_ONCE_INIT;
+static pthread_rwlock_t cluster_list_lock_;
+
+static void cluster_list_init_(void);
+
+static void cluster_fork_init_(void);
+static void cluster_fork_prepare_(void);
+static void cluster_fork_parent_(void);
+static void cluster_fork_child_(void);
+#endif
+
+static void cluster_list_wrlock_(void);
+static void cluster_list_rdlock_(void);
+static void cluster_list_unlock_(void);
+
 /* Create a new cluster connection */
 CLUSTER *
 cluster_create(const char *key)
@@ -38,8 +59,11 @@ cluster_create(const char *key)
 		return NULL;
 	}
 #ifdef WITH_PTHREAD
-	pthread_rwlock_init(&(p->lock), NULL);
+	pthread_once(&cluster_list_control_, cluster_list_init_);
+	pthread_once(&cluster_fork_control_, cluster_fork_init_);
+	pthread_rwlock_init(&(p->lock), NULL);	
 #endif
+	p->forkmode = CLUSTER_FORK_CHILD;
 	p->inst_threads = 1;
 	p->instid = (char *) malloc(33);
 	if(!p->instid)
@@ -48,6 +72,7 @@ cluster_create(const char *key)
 		cluster_destroy(p);
 		return NULL;
 	}
+	p->instid[0] = 0;
 # ifdef WITH_LIBUUID
 	uuid_generate(uuid);
 	uuid_unparse_lower(uuid, uuidbuf);
@@ -80,6 +105,18 @@ cluster_create(const char *key)
 	p->ttl = CLUSTER_DEFAULT_TTL;
 	p->refresh = CLUSTER_DEFAULT_REFRESH;
 # endif
+	cluster_list_wrlock_();
+	if(cluster_last_)
+	{
+		cluster_last_->next = p;
+		p->prev = cluster_last_;
+	}
+	else
+	{
+		cluster_first_ = p;
+	}
+	cluster_last_ = p;
+	cluster_list_unlock_();
 	return p;
 }
 
@@ -87,6 +124,24 @@ cluster_create(const char *key)
 int
 cluster_destroy(CLUSTER *cluster)
 {
+	cluster_list_wrlock_();
+	if(cluster->prev)
+	{
+		cluster->prev->next = cluster->next;
+	}
+	if(cluster->next)
+	{
+		cluster->next->prev = cluster->prev;
+	}
+	if(cluster_first_ == cluster)
+	{
+		cluster_first_ = cluster->next;
+	}
+	if(cluster_last_ == cluster)
+	{
+		cluster_last_ = cluster->prev;
+	}
+	cluster_list_unlock_();
 	cluster_leave(cluster);
 	cluster_wrlock_(cluster);
 	free(cluster->instid);
@@ -299,6 +354,47 @@ cluster_set_instance(CLUSTER *cluster, const char *name)
 		cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: instance identifier set to '%s'\n", cluster->instid);
 	}
 	cluster_unlock_(cluster);
+	return 0;
+}
+
+/* Reset the instance identifier for a node - if we're using UUIDs, this will trigger
+ * a new UUID to be generated, otherwise it will be set to an empty string.
+ */
+int
+cluster_reset_instance(CLUSTER *p)
+{
+	char *instid;
+# ifdef WITH_LIBUUID
+	uuid_t uuid;
+	char uuidbuf[40], *s;
+	const char *t;
+# endif
+
+	instid = (char *) malloc(33);
+	if(!p->instid)
+	{
+		cluster_logf_(p, LOG_CRIT, "libcluster: failed to allocate buffer for instance identifier\n");
+		return -1;
+	}
+	instid[0] = 0;
+# ifdef WITH_LIBUUID
+	uuid_generate(uuid);
+	uuid_unparse_lower(uuid, uuidbuf);
+	s = instid;
+	for(t = uuidbuf; *t; t++)
+	{
+		if(isalnum(*t))
+		{
+			*s = *t;
+			s++;
+		}
+	}
+	*s = 0;
+# endif
+	cluster_wrlock_(p);
+	free(p->instid);
+	p->instid = instid;
+	cluster_unlock_(p);
 	return 0;
 }
 
@@ -686,3 +782,118 @@ cluster_unlock_(CLUSTER *cluster)
 #endif
 }
 
+#if WITH_PTHREAD
+/* Initialse the R/W lock which protects the cluster list */
+static void
+cluster_list_init_(void)
+{
+	pthread_rwlock_init(&cluster_list_lock_, NULL);
+}
+
+/* Initialise the at-fork handler */
+static void
+cluster_fork_init_(void)
+{
+	pthread_atfork(cluster_fork_prepare_, cluster_fork_parent_, cluster_fork_child_);
+}
+
+/* Invoked prior to fork() being called */
+static void
+cluster_fork_prepare_(void)
+{
+	CLUSTER *p;
+
+	cluster_list_rdlock_();
+	for(p = cluster_first_; p; p = p->next)
+	{
+		switch(p->type)
+		{
+		case CT_STATIC:
+			break;
+		case CT_ETCD:
+			cluster_etcd_prepare_(p);
+			break;
+		case CT_SQL:
+			cluster_sql_prepare_(p);
+			break;
+		}
+	}
+	cluster_list_unlock_();
+}
+
+/* Invoked in the child process after the parent has forked */
+static void
+cluster_fork_child_(void)
+{
+	CLUSTER *p;
+
+	cluster_list_rdlock_();
+	for(p = cluster_first_; p; p = p->next)
+	{
+		switch(p->type)
+		{
+		case CT_STATIC:
+			break;
+		case CT_ETCD:
+			cluster_etcd_child_(p);
+			break;
+		case CT_SQL:
+			cluster_sql_child_(p);
+			break;
+		}
+	}
+	cluster_list_unlock_();
+}
+
+/* Invoked in the parent process after it's forked a child */
+static void
+cluster_fork_parent_(void)
+{
+	CLUSTER *p;
+
+	cluster_list_rdlock_();
+	for(p = cluster_first_; p; p = p->next)
+	{
+		switch(p->type)
+		{
+		case CT_STATIC:
+			break;
+		case CT_ETCD:
+			cluster_etcd_parent_(p);
+			break;
+		case CT_SQL:
+			cluster_sql_parent_(p);
+			break;
+		}
+	}
+	cluster_list_unlock_();
+}
+
+#endif
+
+
+void
+cluster_list_wrlock_(void)
+{
+#ifdef WITH_PTHREAD
+	pthread_rwlock_wrlock(&cluster_list_lock_);
+#endif
+}
+
+
+void
+cluster_list_rdlock_(void)
+{
+#ifdef WITH_PTHREAD
+	pthread_rwlock_rdlock(&cluster_list_lock_);
+#endif
+}
+
+
+void
+cluster_list_unlock_(void)
+{
+#ifdef WITH_PTHREAD
+	pthread_rwlock_unlock(&cluster_list_lock_);
+#endif
+}

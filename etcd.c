@@ -297,6 +297,86 @@ cluster_etcd_balance_(CLUSTER *cluster)
 	return 0;
 }
 
+/* Prepare for a process to fork() */
+void
+cluster_etcd_prepare_(CLUSTER *p)
+{
+	CLUSTERFLAGS flags;
+	pthread_t pt, bt;
+
+	cluster_wrlock_(p);
+	if(p->flags & CF_VERBOSE)
+	{
+		cluster_logf_locked_(p, LOG_INFO, "libcluster: etcd: preparing for fork()\n");
+	}
+	flags = p->flags;
+	p->flags |= CF_LEAVING;
+	pt = p->ping_thread;
+	bt = p->balancer_thread;
+	cluster_unlock_(p);
+	if(pt)
+	{
+		pthread_join(pt, NULL);
+	}
+	if(bt)
+	{
+		pthread_join(bt, NULL);
+	}
+	cluster_wrlock_(p);
+	p->ping_thread = 0;
+	p->balancer_thread = 0;
+	if(p->flags & CF_VERBOSE)
+	{
+		cluster_logf_locked_(p, LOG_INFO, "libcluster: etcd: threads terminated\n");
+	}
+	p->flags = flags;
+	cluster_unlock_(p);
+}
+
+/* Invoked after fork() in the child process */
+void
+cluster_etcd_child_(CLUSTER *p)
+{
+	cluster_wrlock_(p);
+	if(p->forkmode & CLUSTER_FORK_CHILD)
+	{
+		if(p->forkmode & CLUSTER_FORK_PARENT)
+		{
+			/* We're re-joining the cluster in both the parent and the child, therefore
+			 * the child will be assigned a new instance UUID
+			 */
+			cluster_reset_instance(p);
+		}
+		if(p->flags & CF_JOINED)
+		{
+			if(p->flags & CF_VERBOSE)
+			{
+				cluster_logf_locked_(p, LOG_NOTICE, "libcluster: etcd: resuming cluster membership in child process\n");
+			}
+			pthread_create(&(p->ping_thread), NULL, cluster_etcd_ping_thread_, (void *) p);
+			pthread_create(&(p->balancer_thread), NULL, cluster_etcd_balancer_thread_, (void *) p);
+		}
+	}
+	cluster_unlock_(p);
+}
+
+/* Invoked after fork() in the parent process */
+void
+cluster_etcd_parent_(CLUSTER *p)
+{
+	cluster_wrlock_(p);
+	if((p->forkmode & CLUSTER_FORK_PARENT) && (p->flags & CF_JOINED))
+	{
+		if(p->flags & CF_VERBOSE)
+		{
+			cluster_logf_locked_(p, LOG_NOTICE, "libcluster: etcd: resuming cluster membership in parent process\n");
+		}
+		pthread_create(&(p->ping_thread), NULL, cluster_etcd_ping_thread_, (void *) p);
+		pthread_create(&(p->balancer_thread), NULL, cluster_etcd_balancer_thread_, (void *) p);
+	}
+	cluster_unlock_(p);
+}
+
 /* Periodic ping thread: periodically (every cluster->refresh seconds)
  * ping the registry service until cluster->flags & CF_LEAVING is set.
  */
