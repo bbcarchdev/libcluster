@@ -244,14 +244,14 @@ cluster_sql_balance_(CLUSTER *cluster)
 			base = total;
 			if(cluster->flags & CF_VERBOSE)
 			{
-				cluster_logf_locked_(cluster, LOG_DEBUG, "* %s [%d]\n", cluster->instid, total);
+				cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: * %s [%d]\n", cluster->instid, total);
 			}
 		}
 		else
 		{
 			if(cluster->flags & CF_VERBOSE)
 			{
-				cluster_logf_locked_(cluster, LOG_DEBUG, "  %s [%d]\n", id, total);
+				cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster:   %s [%d]\n", id, total);
 			}
 		}
 		total += val;
