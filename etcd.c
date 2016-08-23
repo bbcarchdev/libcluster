@@ -25,6 +25,7 @@
 
 static int cluster_etcd_ping_(CLUSTER *cluster, ETCDFLAGS flags);
 static int cluster_etcd_unping_(CLUSTER *cluster, ETCDFLAGS flags);
+static int cluster_etcd_rejoin_(CLUSTER *cluster);
 static void *cluster_etcd_ping_thread_(void *arg);
 static void *cluster_etcd_balancer_thread_(void *arg);
 static int cluster_etcd_balance_(CLUSTER *cluster);
@@ -128,15 +129,25 @@ cluster_etcd_join_(CLUSTER *cluster)
 int
 cluster_etcd_leave_(CLUSTER *cluster)
 {
+	pthread_t pt, bt;
+
 	/* Use a write-lock to prevent a read-lock - write-lock race */
 	cluster_wrlock_(cluster);
 	if(cluster->flags & CF_JOINED)
 	{
 		cluster->flags |= CF_LEAVING;
+		pt = cluster->ping_thread;
+		bt = cluster->balancer_thread;
 		/* Unlock to allow the threads to read the flag */
 		cluster_unlock_(cluster);
-		pthread_join(cluster->ping_thread, NULL);
-		pthread_join(cluster->balancer_thread, NULL);
+		if(pt)
+		{
+			pthread_join(pt, NULL);
+		}
+		if(bt)
+		{
+			pthread_join(bt, NULL);
+		}
 		/* Re-acquire the lock so that the unwinding can safely complete */
 		cluster_wrlock_(cluster);
 	}
@@ -325,6 +336,10 @@ cluster_etcd_prepare_(CLUSTER *p)
 	cluster_wrlock_(p);
 	p->ping_thread = 0;
 	p->balancer_thread = 0;
+	p->inst_index = -1;
+	p->inst_threads = 0;
+	p->total_threads = 0;
+	cluster_rebalanced_(p);
 	if(p->flags & CF_VERBOSE)
 	{
 		cluster_logf_locked_(p, LOG_INFO, "libcluster: etcd: threads terminated\n");
@@ -337,6 +352,9 @@ cluster_etcd_prepare_(CLUSTER *p)
 void
 cluster_etcd_child_(CLUSTER *p)
 {
+	int r;
+
+	r = 0;
 	cluster_wrlock_(p);
 	if(p->forkmode & CLUSTER_FORK_CHILD)
 	{
@@ -353,17 +371,23 @@ cluster_etcd_child_(CLUSTER *p)
 			{
 				cluster_logf_locked_(p, LOG_NOTICE, "libcluster: etcd: resuming cluster membership in child process\n");
 			}
-			pthread_create(&(p->ping_thread), NULL, cluster_etcd_ping_thread_, (void *) p);
-			pthread_create(&(p->balancer_thread), NULL, cluster_etcd_balancer_thread_, (void *) p);
+			r = cluster_etcd_rejoin_(p);
 		}
 	}
 	cluster_unlock_(p);
+	if(r)
+	{
+		cluster_etcd_leave_(p);
+	}
 }
 
 /* Invoked after fork() in the parent process */
 void
 cluster_etcd_parent_(CLUSTER *p)
 {
+	int r;
+
+	r = 0;
 	cluster_wrlock_(p);
 	if((p->forkmode & CLUSTER_FORK_PARENT) && (p->flags & CF_JOINED))
 	{
@@ -371,10 +395,32 @@ cluster_etcd_parent_(CLUSTER *p)
 		{
 			cluster_logf_locked_(p, LOG_NOTICE, "libcluster: etcd: resuming cluster membership in parent process\n");
 		}
-		pthread_create(&(p->ping_thread), NULL, cluster_etcd_ping_thread_, (void *) p);
-		pthread_create(&(p->balancer_thread), NULL, cluster_etcd_balancer_thread_, (void *) p);
+		r = cluster_etcd_rejoin_(p);
 	}
 	cluster_unlock_(p);
+	if(r)
+	{
+		cluster_etcd_leave_(p);
+	}   
+}
+
+/* Re-join a cluster - the cluster lock must be held for writing */
+static int
+cluster_etcd_rejoin_(CLUSTER *cluster)
+{
+	if(cluster_etcd_ping_(cluster, ETCD_NONE))
+	{
+		cluster_logf_locked_(cluster, LOG_CRIT, "libcluster: etcd: failed to perform initial ping\n");
+		return -1;
+	}
+	if(cluster_etcd_balance_(cluster))
+	{
+		cluster_logf_locked_(cluster, LOG_CRIT, "libcluster: etcd: failed to perform initial balancing\n");
+		return -1;
+	}
+	pthread_create(&(cluster->ping_thread), NULL, cluster_etcd_ping_thread_, (void *) cluster);
+	pthread_create(&(cluster->balancer_thread), NULL, cluster_etcd_balancer_thread_, (void *) cluster);
+	return 0;
 }
 
 /* Periodic ping thread: periodically (every cluster->refresh seconds)
