@@ -1,4 +1,6 @@
 language: c
+sudo: required
+os: trusty
 compiler: clang
 before_install:
 - curl https://letsencrypt.org/certs/isrgrootx1.pem.txt | sudo tee /usr/share/ca-certificates/isrgrootx1.crt
