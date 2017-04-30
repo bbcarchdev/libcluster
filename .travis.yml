@@ -14,3 +14,5 @@ before_install:
 - sudo apt-get install -qq liburi-dev libsql-dev automake autoconf libtool pkg-config libedit-dev uuid-dev libjansson-dev libcurl4-openssl-dev
 before_script:
 - autoreconf -f -i
+script:
+- ./configure && make && make check
