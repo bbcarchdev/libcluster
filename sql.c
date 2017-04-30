@@ -1,6 +1,6 @@
 /* Author: Mo McRoberts <mo.mcroberts@bbc.co.uk>
  *
- * Copyright (c) 2015-2016 BBC
+ * Copyright (c) 2015-2017 BBC
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@
 
 #ifdef ENABLE_SQL
 
-# define CLUSTER_SQL_SCHEMA_VERSION     5
+# define CLUSTER_SQL_SCHEMA_VERSION     7
 # define CLUSTER_SQL_BALANCE_SLEEP      5
 # define CLUSTER_SQL_MAX_BALANCEWAIT    30
 
@@ -678,6 +678,53 @@ cluster_sql_migrate_(SQL *restrict sql, const char *restrict identifier, int new
 			return -1;
 		}
 		if(sql_execute(sql, "CREATE INDEX \"cluster_node_partition\" ON \"cluster_node\" (\"partition\")"))
+		{
+			return -1;
+		}
+		return 0;
+	}
+	if(newversion == 6)
+	{
+		/* cluster_data allows applications to store associate key-value pairs
+		 * with a cluster
+		 */
+		if(sql_execute(sql, "CREATE TABLE \"cluster_data\" ( "
+					   " \"key\" VARCHAR(32) NOT NULL, "
+					   " \"env\" VARCHAR(32) NOT NULL, "
+					   " \"name\" VARCHAR(32) NOT NULL, "
+					   " \"value\" TEXT DEFAULT NULL, "
+					   " PRIMARY KEY (\"key\", \"env\", \"name\") "
+					   ")"))
+		{
+			return -1;
+		}
+		if(sql_execute(sql, "CREATE INDEX \"cluster_data_key_env\" ON \"cluster_data\" (\"key\", \"env\")"))
+		{
+			return -1;
+		}
+		return 0;
+	}
+	if(newversion == 7)
+	{
+		/* cluster_node_data allows applications to store associate key-value pairs
+		 * with an individual node
+		 */
+		if(sql_execute(sql, "CREATE TABLE \"cluster_node_data\" ( "
+					   " \"id\" VARCHAR(32) NOT NULL, "
+					   " \"key\" VARCHAR(32) NOT NULL, "
+					   " \"env\" VARCHAR(32) NOT NULL, "
+					   " \"name\" VARCHAR(32) NOT NULL, "
+					   " \"value\" TEXT DEFAULT NULL, "
+					   " PRIMARY KEY (\"id\", \"key\", \"env\", \"name\") "
+					   ")"))
+		{
+			return -1;
+		}
+		if(sql_execute(sql, "CREATE INDEX \"cluster_node_data_id_key_env\" ON \"cluster_node_data\" (\"id\", \"key\", \"env\")"))
+		{
+			return -1;
+		}
+		if(sql_execute(sql, "CREATE INDEX \"cluster_node_data_key_env\" ON \"cluster_node_data\" (\"key\", \"env\")"))
 		{
 			return -1;
 		}
