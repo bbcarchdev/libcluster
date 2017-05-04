@@ -1,6 +1,6 @@
 /* Author: Mo McRoberts <mo.mcroberts@bbc.co.uk>
  *
- * Copyright (c) 2015-2016 BBC
+ * Copyright (c) 2015-2017 BBC
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -596,6 +596,19 @@ cluster_set_workers(CLUSTER *cluster, int nworkers)
 	{
 		cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: number of workers in this cluster member set to %d\n", cluster->inst_threads);
 	}
+	cluster_unlock_(cluster);
+	return 0;
+}
+
+/* Atomically obtain the current state of the cluster membership */
+int
+cluster_state(CLUSTER *cluster, CLUSTERSTATE *state)
+{
+	memset(&state, 0, sizeof(CLUSTERSTATE));
+	cluster_rdlock_(cluster);
+	state->index = cluster->inst_index;
+	state->workers = cluster->inst_threads;
+	state->total = cluster->total_threads;
 	cluster_unlock_(cluster);
 	return 0;
 }

@@ -1,6 +1,6 @@
 ## Author: Mo McRoberts <mo.mcroberts@bbc.co.uk>
 ##
-## Copyright 2015 BBC.
+## Copyright 2015-2017 BBC.
 ##
 ##  Licensed under the Apache License, Version 2.0 (the "License");
 ##  you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ lib_LTLIBRARIES = libcluster.la
 
 include_HEADERS = libcluster.h
 
-noinst_PROGRAMS = cluster-test
+bin_PROGRAMS = cluster-test
 
 AM_CPPFLAGS = @AM_CPPFLAGS@ @CPPFLAGS@ @LIBUUID_CPPFLAGS@ \
 	-Ilibetcd -I$(srcdir)/libetcd

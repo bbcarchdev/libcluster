@@ -1,6 +1,6 @@
 /* Author: Mo McRoberts <mo.mcroberts@bbc.co.uk>
  *
- * Copyright (c) 2015-2016 BBC
+ * Copyright (c) 2015-2017 BBC
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -117,6 +117,9 @@ int cluster_workers(CLUSTER *cluster);
 
 /* Set the number of worker this cluster member has */
 int cluster_set_workers(CLUSTER *cluster, int nworkers);
+
+/* Atomically obtain the current cluster state */
+int cluster_state(CLUSTER *cluster, CLUSTERSTATE *statebuf);
 
 /* Set the registry endpoint URI; NULL indicates this is a static cluster */
 int cluster_set_registry(CLUSTER *cluster, const char *uri);
