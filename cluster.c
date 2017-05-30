@@ -604,7 +604,7 @@ cluster_set_workers(CLUSTER *cluster, int nworkers)
 int
 cluster_state(CLUSTER *cluster, CLUSTERSTATE *state)
 {
-	memset(&state, 0, sizeof(CLUSTERSTATE));
+	memset(state, 0, sizeof(CLUSTERSTATE));
 	cluster_rdlock_(cluster);
 	state->index = cluster->inst_index;
 	state->workers = cluster->inst_threads;
