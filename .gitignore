@@ -31,5 +31,3 @@ Makefile.in
 /ltmain.sh
 /libtool
 /compile
-/cluster-test
-/libcluster-config

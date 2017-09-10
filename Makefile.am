@@ -17,11 +17,9 @@
 
 ACLOCAL_AMFLAGS = -I m4
 
-if ENABLE_ETCD
+DIST_SUBDIRS = m4 libetcd engines util
 
-SUBDIRS = libetcd .
-
-endif
+SUBDIRS = libetcd engines . util
 
 EXTRA_DIST = README.md LICENSE-2.0 libcluster.pc.in libcluster-uninstalled.pc.in
 
@@ -33,27 +31,24 @@ noinst_DATA = libcluster-uninstalled.pc
 
 pkgconfig_DATA = libcluster.pc
 
+AM_CPPFLAGS = @AM_CPPFLAGS@ @CPPFLAGS@ @LIBUUID_CPPFLAGS@ \
+	-I$(top_builddir)/libetcd -I$(top_srcdir)/libetcd
+
 lib_LTLIBRARIES = libcluster.la
 
 include_HEADERS = libcluster.h
 
-bin_PROGRAMS = cluster-test
-
-AM_CPPFLAGS = @AM_CPPFLAGS@ @CPPFLAGS@ @LIBUUID_CPPFLAGS@ \
-	-Ilibetcd -I$(srcdir)/libetcd
-
 libcluster_la_SOURCES = libcluster.h \
 	p_libcluster.h \
-	cluster.c static.c etcd.c sql.c
+	cluster.c
 
 libcluster_la_LDFLAGS = @AM_LDFLAGS@ \
 	@LIBURI_LDFLAGS@ \
 	-noinst -avoid-version
 
 libcluster_la_LIBADD = \
+	engines/libengines.la \
 	@convenience_libs@ @LOCAL_LIBS@ @LIBS@
-
-cluster_test_LDADD = libcluster.la
 
 BRANCH ?= develop
 
@@ -68,3 +63,6 @@ checkout:
 		$(MAKE) checkout BRANCH=$(BRANCH) || exit $? && \
 		cd .. ; \
 	done
+
+reconf:
+	autoreconf -i && $(SHELL) ./config.status --recheck && $(SHELL) ./config.status

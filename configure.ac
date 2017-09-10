@@ -18,7 +18,9 @@
 AC_INIT([libcluster],m4_esyscmd([/bin/sh m4/get-version.sh]),[RESFeedback@bbc.co.uk],,[https://github.com/bbcarchdev/libcluster/])
 PACKAGE_DESC='Clustering support library'
 AC_SUBST([PACKAGE_DESC])
+
 AC_CONFIG_MACRO_DIR([m4])
+AC_CONFIG_AUX_DIR([scripts])
 
 AM_INIT_AUTOMAKE([foreign subdir-objects])
 AM_MAINTAINER_MODE
@@ -142,6 +144,8 @@ AC_SUBST([convenience_libs])
 AC_CONFIG_FILES([
 Makefile
 libetcd/Makefile
+engines/Makefile
+util/Makefile
 m4/Makefile
 libcluster.pc
 libcluster-uninstalled.pc
