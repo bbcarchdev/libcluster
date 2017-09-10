@@ -97,7 +97,10 @@ cluster_sql_join_(CLUSTER *cluster)
 		cluster_sql_leave_(cluster);
 		return -1;
 	}
-	pthread_create(&(cluster->ping_thread), NULL, cluster_sql_ping_thread_, (void *) cluster);
+	if(!(cluster->flags & CF_PASSIVE))
+	{
+		pthread_create(&(cluster->ping_thread), NULL, cluster_sql_ping_thread_, (void *) cluster);
+	}
 	pthread_create(&(cluster->balancer_thread), NULL, cluster_sql_balancer_thread_, (void *) cluster);
 	cluster->flags |= CF_JOINED;
 	cluster_unlock_(cluster);
@@ -164,6 +167,10 @@ cluster_sql_leave_(CLUSTER *cluster)
 static int
 cluster_sql_ping_(CLUSTER *cluster)
 {
+	if(cluster->flags & CF_PASSIVE)
+	{
+		return 0;
+	}
 	return sql_perform(cluster->pingdb, cluster_sql_perform_ping_, (void *) cluster, 5, SQL_TXN_CONSISTENT);
 }
 
@@ -204,6 +211,10 @@ cluster_sql_perform_ping_(SQL *restrict sql, void *restrict userdata)
 static int
 cluster_sql_unping_(CLUSTER *cluster)
 {
+	if(cluster->flags & CF_PASSIVE)
+	{
+		return 0;
+	}
 	if(sql_executef(cluster->pingdb, "DELETE FROM \"cluster_node\" WHERE \"id\" = %Q AND \"key\" = %Q AND \"env\" = %Q", cluster->instid, cluster->key, cluster->env))
 	{
 		return -1;
@@ -250,7 +261,7 @@ cluster_sql_balance_(CLUSTER *cluster)
 	{
 		id = sql_stmt_str(rs, 0);
 		val = sql_stmt_long(rs, 1);
-		if(!strcmp(id, cluster->instid))
+		if(!strcmp(id, cluster->instid) && !(cluster->flags & CF_PASSIVE))
 		{
 			base = total;
 			if(cluster->flags & CF_VERBOSE)
@@ -411,7 +422,10 @@ cluster_sql_rejoin_(CLUSTER *cluster)
 		cluster_logf_locked_(cluster, LOG_CRIT, "libcluster: SQL: failed to perform initial balancing\n");
 		return -1;
 	}
-	pthread_create(&(cluster->ping_thread), NULL, cluster_sql_ping_thread_, (void *) cluster);
+	if(!(cluster->flags & CF_PASSIVE))
+	{
+		pthread_create(&(cluster->ping_thread), NULL, cluster_sql_ping_thread_, (void *) cluster);
+	}
 	pthread_create(&(cluster->balancer_thread), NULL, cluster_sql_balancer_thread_, (void *) cluster);
 	return 0;
 }

@@ -51,6 +51,8 @@ struct cluster_state_struct
 	int workers;
 	/* The total number of workers across the whole cluster */
 	int total;
+	/* Have we joined passively? */
+	int passive;
 };
 
 /* Create a new cluster connection */
@@ -61,6 +63,9 @@ int cluster_destroy(CLUSTER *cluster);
 
 /* Join a cluster using the currently configured parameters */
 int cluster_join(CLUSTER *cluster);
+
+/* Join a cluster passively - i.e., without participating in it */
+int cluster_join_passive(CLUSTER *cluster);
 
 /* Leave a cluster previously joined with cluster_join() */
 int cluster_leave(CLUSTER *cluster);

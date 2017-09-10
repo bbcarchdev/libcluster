@@ -189,8 +189,43 @@ cluster_join(CLUSTER *cluster)
 	default:
 		break;
 	}
-	cluster_logf_locked_(cluster, LOG_CRIT, "libcluster: cannot join cluster type <%d> which is not implemented\n", type);
+	cluster_logf_(cluster, LOG_CRIT, "libcluster: cannot join cluster type <%d> which is not implemented\n", type);
+	errno = EPERM;
+	return -1;
+}
+
+/* Join a cluster passively */
+int
+cluster_join_passive(CLUSTER *cluster)
+{
+	CLUSTERTYPE type;
+
+	cluster_rdlock_(cluster);
+	if((cluster->flags & CF_JOINED))
+	{
+		cluster_logf_locked_(cluster, LOG_DEBUG, "libcluster: ignoring attempt to join a cluster which has already been joined\n");
+		cluster_unlock_(cluster);
+		return 0;
+	}
+	cluster->flags |= CF_PASSIVE;
+	type = cluster->type;
 	cluster_unlock_(cluster);
+	switch(type)
+	{
+	case CT_STATIC:
+		return cluster_static_join_(cluster);
+#ifdef ENABLE_ETCD
+	case CT_ETCD:
+		return cluster_etcd_join_(cluster);
+#endif
+#ifdef ENABLE_SQL
+	case CT_SQL:
+		return cluster_sql_join_(cluster);
+#endif
+	default:
+		break;
+	}
+	cluster_logf_(cluster, LOG_CRIT, "libcluster: cannot join cluster type <%d> which is not implemented\n", type);
 	errno = EPERM;
 	return -1;
 }
@@ -609,6 +644,7 @@ cluster_state(CLUSTER *cluster, CLUSTERSTATE *state)
 	state->index = cluster->inst_index;
 	state->workers = cluster->inst_threads;
 	state->total = cluster->total_threads;
+	state->passive = !!(cluster->flags & CF_PASSIVE);
 	cluster_unlock_(cluster);
 	return 0;
 }

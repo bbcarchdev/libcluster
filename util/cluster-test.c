@@ -74,8 +74,8 @@ usage(void)
 		   "  -p NAME                   Set the instance partition to NAME\n"
 		   "  -i ID                     Set the instance identifier to ID\n"
 		   "  -n COUNT                  Set the number of workers to COUNT\n"
-		   " etcd-based clustering:\n"
 		   "  -r URI                    Set the cluster registry URI\n"
+		   "  -P                        Join the cluster passively\n"
 		   " Static clustering:\n"
 		   "  -I INDEX                  Set this instance base index to INDEX\n"
 		   "  -T COUNT                  Set the cluster worker total to COUNT\n",
@@ -92,14 +92,16 @@ main(int argc, char **argv)
 	const char *registry = NULL;
 	const char *instid = NULL;
 	const char *partition = NULL;
-	int nworkers = 0, instindex = 0, total = 0, verbose = 0, dofork = 0;
+	int nworkers = 0, instindex = 0, total = 0, verbose = 0, dofork = 0, passive = 0;
+	int r;
 	pid_t child;
 	CLUSTER *cluster;
+	CLUSTERSTATE state;
 
 	t = strrchr(argv[0], '/');
 	short_program_name = (t ? t + 1 : argv[0]);
 	
-	while((c = getopt(argc, argv, "hvFk:e:i:n:r:I:T:p:")) != -1)
+	while((c = getopt(argc, argv, "hvFk:e:i:n:r:I:T:p:P")) != -1)
 	{
 		switch(c)
 		{
@@ -135,6 +137,9 @@ main(int argc, char **argv)
 			break;
 		case 'p':
 			partition = optarg;
+			break;
+		case 'P':
+			passive = 1;
 			break;
 		default:
 			usage();
@@ -176,10 +181,33 @@ main(int argc, char **argv)
 		cluster_static_set_total(cluster, total);
 	}
 	signal(SIGINT, inthandler);
-	if(cluster_join(cluster))
+	if(passive)
+	{
+		r = cluster_join_passive(cluster);
+	}
+	else
+	{
+		r = cluster_join(cluster);
+	}
+	if(r)
 	{
 		fprintf(stderr, "%s: failed to join cluster: %s\n", short_program_name, strerror(errno));
 		exit(EXIT_FAILURE);
+	}
+	if(cluster_state(cluster, &state))
+	{
+		fprintf(stderr, "%s: failed to obtain cluster state: %s\n", short_program_name, strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	if(state.passive)
+	{
+		fprintf(stderr, "%s: passively-joined a cluster of %d workers\n",
+				short_program_name, state.total);
+	}
+	else
+	{
+		fprintf(stderr, "%s: actively-joined a cluster of %d workers (our node is workers #%d-%d)\n",
+				short_program_name, state.total, state.index, state.index + state.workers);
 	}
 	if(dofork)
 	{

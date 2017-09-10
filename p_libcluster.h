@@ -1,6 +1,6 @@
 /* Author: Mo McRoberts <mo.mcroberts@bbc.co.uk>
  *
- * Copyright (c) 2015 BBC
+ * Copyright (c) 2015-2017 BBC
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -104,7 +104,8 @@ typedef enum
 	CF_NONE = 0,
 	CF_JOINED = (1<<0),
 	CF_LEAVING = (1<<1),
-	CF_VERBOSE = (1<<2)
+	CF_VERBOSE = (1<<2),
+	CF_PASSIVE = (1<<3)
 } CLUSTERFLAGS;
 
 struct cluster_struct
