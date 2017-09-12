@@ -56,6 +56,8 @@
 # define CLUSTER_DEFAULT_TTL            120
 /* Default etcd refresh time */
 # define CLUSTER_DEFAULT_REFRESH        30
+/* Maximum length of a job identifier */
+# define CLUSTER_JOB_ID_LEN             32
 
 /* We only use syslog for the LOG_xxx constants; if they aren't available
  * we can provide generic values instead.
@@ -153,7 +155,17 @@ struct cluster_struct
 # endif /*WITH_PTHREAD*/
 };
 
+struct cluster_job_struct
+{
+	CLUSTER *cluster;
+	char id[CLUSTER_JOB_ID_LEN+1];
+	char parent[CLUSTER_JOB_ID_LEN+1];
+	int total;
+	int progress;
+};
+
 void cluster_logf_(CLUSTER *cluster, int priority, const char *format, ...);
+void cluster_vlogf_(CLUSTER *cluster, int priority, const char *format, va_list ap);
 void cluster_logf_locked_(CLUSTER *cluster, int priority, const char *format, ...);
 void cluster_vlogf_locked_(CLUSTER *cluster, int priority, const char *format, va_list ap);
 
@@ -165,7 +177,7 @@ void cluster_vlogf_locked_(CLUSTER *cluster, int priority, const char *format, v
 #   define cluster_logf_(cluster...)   /* */
 #   define cluster_logf_locked_(cluster...) /* */
 #  else
-#   define NEED_LOGGING_NOOPS          1
+#   define NEED_LOGGING_NOOPS           1
 #  endif
 #  define cluster_vlogf_locked_(c, p, f, a) /* */
 # endif

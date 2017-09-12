@@ -22,6 +22,7 @@
 
 typedef struct cluster_struct CLUSTER;
 typedef struct cluster_state_struct CLUSTERSTATE;
+typedef struct cluster_job_struct CLUSTERJOB;
 typedef int (*CLUSTERBALANCE)(CLUSTER *cluster, CLUSTERSTATE *state);
 
 /* Enumeration for how libcluster should behave when the process invokes
@@ -147,5 +148,38 @@ int cluster_static_set_index(CLUSTER *cluster, int instindex);
 
 /* Set the total number of workers in the cluster */
 int cluster_static_set_total(CLUSTER *cluster, int total);
+
+/** Job tracking **/
+
+/* Create a job object */
+CLUSTERJOB *cluster_job_create(CLUSTER *cluster);
+
+/* Create a job object with a specific ID */
+CLUSTERJOB *cluster_job_create_id(CLUSTER *cluster, const char *str);
+
+/* Destroy a job object */
+int cluster_job_destroy(CLUSTERJOB *job);
+
+/* Set the parent of a job */
+int cluster_job_set_parent_job(CLUSTERJOB *job, CLUSTERJOB *parent);
+int cluster_job_set_parent_id(CLUSTERJOB *job, const char *parentstr);
+
+/* Change the ID of a job, if possible */
+int cluster_job_set_id(CLUSTERJOB *job, const char *newid);
+
+/* Set the total and progress values for a job (not including child job processing) */
+int cluster_job_set_total(CLUSTERJOB *job, int total);
+int cluster_job_set_progress(CLUSTERJOB *job, int total);
+
+/* Log an event related to a job */
+int cluster_job_log(CLUSTERJOB *job, int prio, const char *message);
+int cluster_job_vlogf(CLUSTERJOB *job, int prio, const char *message, va_list ap);
+int cluster_job_logf(CLUSTERJOB *job, int prio, const char *message, ...);
+
+/* Job status tracking */
+int cluster_job_wait(CLUSTERJOB *job);
+int cluster_job_begin(CLUSTERJOB *job);
+int cluster_job_complete(CLUSTERJOB *job);
+int cluster_job_fail(CLUSTERJOB *job);
 
 #endif /*!LIBCLUSTER_H_*/

@@ -771,6 +771,22 @@ cluster_logf_(CLUSTER *cluster, int priority, const char *format, ...)
 #else
 	(void) cluster;
 	(void) priority;
+	(void) format;
+#endif
+}
+
+void
+cluster_vlogf_(CLUSTER *cluster, int priority, const char *format, va_list ap)
+{
+#ifdef ENABLE_LOGGING
+	cluster_rdlock_(cluster);
+	cluster_vlogf_locked_(cluster, priority, format, ap);
+	cluster_unlock_(cluster);
+#else
+	(void) cluster;
+	(void) priority;
+	(void) format;
+	(void) ap;
 #endif
 }
 #endif /*ENABLE_LOGGING || NEED_LOGGING_NOOPS*/

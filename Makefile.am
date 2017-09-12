@@ -40,7 +40,7 @@ include_HEADERS = libcluster.h
 
 libcluster_la_SOURCES = libcluster.h \
 	p_libcluster.h \
-	cluster.c
+	cluster.c job.c
 
 libcluster_la_LDFLAGS = @AM_LDFLAGS@ \
 	@LIBURI_LDFLAGS@ \
@@ -65,4 +65,6 @@ checkout:
 	done
 
 reconf:
-	autoreconf -i && $(SHELL) ./config.status --recheck && $(SHELL) ./config.status
+	( cd $(top_srcdir) && autoreconf -i ) && \
+		$(SHELL) ./config.status --recheck && \
+		$(SHELL) ./config.status

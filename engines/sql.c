@@ -23,7 +23,7 @@
 
 #ifdef ENABLE_SQL
 
-# define CLUSTER_SQL_SCHEMA_VERSION     7
+# define CLUSTER_SQL_SCHEMA_VERSION     8
 # define CLUSTER_SQL_BALANCE_SLEEP      5
 # define CLUSTER_SQL_MAX_BALANCEWAIT    30
 
@@ -739,6 +739,26 @@ cluster_sql_migrate_(SQL *restrict sql, const char *restrict identifier, int new
 			return -1;
 		}
 		if(sql_execute(sql, "CREATE INDEX \"cluster_node_data_key_env\" ON \"cluster_node_data\" (\"key\", \"env\")"))
+		{
+			return -1;
+		}
+		return 0;
+	}
+	if(newversion == 8)
+	{
+		if(sql_execute(sql, "CREATE TABLE \"cluster_job\" ( "
+					   " \"id\" VARCHAR(32) NOT NULL, "
+					   " \"key\" VARCHAR(32) NOT NULL, "
+					   " \"env\" VARCHAR(32) NOT NULL, "
+					   " \"parent\" VARCHAR(32) default NULL, "
+					   " \"status\" VARCHAR(16) NOT NULL default 'WAIT', "
+					   " \"created\" DATETIME NOT NULL, "
+					   " \"updated\" DATETIME NOT NULL, "
+					   " \"node\" VARCHAR(32) default NULL, "
+					   " \"progress\" INT NOT NULL default 0, "
+					   " \"total\" INT NOT NULL default 1, "
+					   " PRIMARY KEY (\"id\", \"key\", \"env\") "
+					   ")"))			
 		{
 			return -1;
 		}
