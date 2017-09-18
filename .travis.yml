@@ -5,14 +5,21 @@ compiler: clang
 before_install:
 - curl https://letsencrypt.org/certs/isrgrootx1.pem.txt | sudo tee /usr/share/ca-certificates/isrgrootx1.crt
 - echo "isrgrootx1.crt" | sudo tee -a /etc/ca-certificates.conf
-- curl https://letsencrypt.org/certs/lets-encrypt-x3-cross-signed.pem.txt | sudo tee /usr/share/ca-certificates/lets-encrypt-x3-cross-signed.crt
+- curl https://letsencrypt.org/certs/lets-encrypt-x3-cross-signed.pem.txt | sudo tee
+  /usr/share/ca-certificates/lets-encrypt-x3-cross-signed.crt
 - echo "lets-encrypt-x3-cross-signed.crt" | sudo tee -a /etc/ca-certificates.conf
 - sudo update-ca-certificates
-- curl https://raw.githubusercontent.com/bbcarchdev/bbcarchdev-keys/main/bbcarchdev-apt.asc | sudo apt-key add -
-- echo "deb [arch=amd64] https://apt.bbcarchdev.net/debian wheezy main ports dev stage live" | sudo tee -a /etc/apt/sources.list
+- curl https://raw.githubusercontent.com/bbcarchdev/bbcarchdev-keys/main/bbcarchdev-apt.asc
+  | sudo apt-key add -
+- echo "deb [arch=amd64] https://apt.bbcarchdev.net/debian wheezy main ports dev stage
+  live" | sudo tee -a /etc/apt/sources.list
 - sudo apt-get update -qq
-- sudo apt-get install -y --force-yes -qq liburi-dev libsql-dev automake autoconf libtool pkg-config libedit-dev uuid-dev libjansson-dev libcurl4-openssl-dev
+- sudo apt-get install -y --force-yes -qq liburi-dev libsql-dev automake autoconf
+  libtool pkg-config libedit-dev uuid-dev libjansson-dev libcurl4-openssl-dev
 before_script:
 - autoreconf -f -i
 script:
 - ./configure && make && make check
+notification:
+  slack:
+    secure: azXlfaMJfI9IBrf/BuGECA3p2qE4Z4myUBUZ0VfwqBY9xFLtsquOl4I3KP2ypDIPDeNCh4SMfTqlDJjFsAwwviX+NtOIKqQfWeNA7xw0YEe4z4FNIIfF1muGnk9wTSOz8O5TW2TXcEKFEkPams5W3vJ04EABxdmT2F5RESRNbQxYI4z1VG4yopgT3Oedbcw4crT2pyo9WbM8d+gTnc/ZLE8HmgjXYLhlOzferpXXyDsLGfxbe2h9F2hG0jZdEzUJ2Ez2rPeyfRWUQyqGL++vPyHw5Txd1o8vra5Qpsa5C7LIgjKNqpcZFoIN34baZnjq/XrQyEF0lNSj34GX60cd7I3JlF37IINkY6o6TZ0jyFB1GGLgMgy2/BXSlk/xxtNZge9LGsUMrAZ8PN70zOE+KRI76KG5pLtqm8dfGeOSOVAqoB4LyIXITXv75/hw7PoJGPRuvvtrddgFBFE97Tnh5JD6NjtRcK223HguBApLoMYZyebApklcn3WF+7m5CV464+ZEleYq6mW62RlufiKiv+UckDzFUVEI8JC1iZ2TG0ivQrgFyWwfmJ3u8s4xTzkwGXV06uG7zMUVArimwt8oVZUEoVEG4w/JGBBKID6y1ny/48s9j9rtqrl7NecS8ij3vIE+AJgaxieCEhcPh5JVFwjwzGYs0Yp22XrO0HiMKFc=
