@@ -147,6 +147,14 @@ cluster_job_set_progress(CLUSTERJOB *job, int progress)
 	return 0;
 }
 
+/* Set a string property on a job */
+int
+cluster_job_set(CLUSTERJOB *restrict job, const char *key, const char *value)
+{
+	cluster_job_logf(job, LOG_INFO, "job %s: %s => %s\n", job->id, key, value);
+	return 0;
+}
+
 /* Log an event related to a job */
 int
 cluster_job_log(CLUSTERJOB *job, int prio, const char *message)

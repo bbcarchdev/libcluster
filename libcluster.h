@@ -171,6 +171,9 @@ int cluster_job_set_id(CLUSTERJOB *job, const char *newid);
 int cluster_job_set_total(CLUSTERJOB *job, int total);
 int cluster_job_set_progress(CLUSTERJOB *job, int total);
 
+/* Set a key-value pair on the job */
+int cluster_job_set(CLUSTERJOB *restrict job, const char *key, const char *value);
+
 /* Log an event related to a job */
 int cluster_job_log(CLUSTERJOB *job, int prio, const char *message);
 int cluster_job_vlogf(CLUSTERJOB *job, int prio, const char *message, va_list ap);
