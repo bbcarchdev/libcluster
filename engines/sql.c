@@ -613,7 +613,7 @@ cluster_sql_migrate_(SQL *restrict sql, const char *restrict identifier, int new
 {
 	CLUSTER *cluster;
 	SQL_VARIANT variant;
-	const char *ddl;
+	const char *ddl, *timetype;
 
 	(void) identifier;
 
@@ -746,19 +746,27 @@ cluster_sql_migrate_(SQL *restrict sql, const char *restrict identifier, int new
 	}
 	if(newversion == 8)
 	{
-		if(sql_execute(sql, "CREATE TABLE \"cluster_job\" ( "
+		if(variant == SQL_VARIANT_MYSQL)
+		{
+			timetype = "DATETIME";
+		}
+		else
+		{
+			timetype = "TIMESTAMP";
+		}
+		if(sql_executef(sql, "CREATE TABLE \"cluster_job\" ( "
 					   " \"id\" VARCHAR(32) NOT NULL, "
 					   " \"key\" VARCHAR(32) NOT NULL, "
 					   " \"env\" VARCHAR(32) NOT NULL, "
 					   " \"parent\" VARCHAR(32) default NULL, "
 					   " \"status\" VARCHAR(16) NOT NULL default 'WAIT', "
-					   " \"created\" DATETIME NOT NULL, "
-					   " \"updated\" DATETIME NOT NULL, "
+					   " \"created\" %s NOT NULL, "
+					   " \"updated\" %s NOT NULL, "
 					   " \"node\" VARCHAR(32) default NULL, "
 					   " \"progress\" INT NOT NULL default 0, "
 					   " \"total\" INT NOT NULL default 1, "
 					   " PRIMARY KEY (\"id\", \"key\", \"env\") "
-					   ")"))			
+						")", timetype, timetype))			
 		{
 			return -1;
 		}
