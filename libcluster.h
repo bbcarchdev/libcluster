@@ -171,7 +171,10 @@ int cluster_job_set_id(CLUSTERJOB *job, const char *newid);
 int cluster_job_set_total(CLUSTERJOB *job, int total);
 int cluster_job_set_progress(CLUSTERJOB *job, int total);
 
-/* Set a key-value pair on the job */
+/* Set the tag used in log messages */
+int cluster_job_set_tag(CLUSTERJOB *restrict job, const char *restrict tag);
+
+/* Set a key-value property pair on the job */
 int cluster_job_set(CLUSTERJOB *restrict job, const char *key, const char *value);
 
 /* Log an event related to a job */

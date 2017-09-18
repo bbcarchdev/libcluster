@@ -73,7 +73,9 @@ cluster_job_create_id(CLUSTER *cluster, const char *str)
 	job->cluster = cluster;
 	strncpy(job->id, str, CLUSTER_JOB_ID_LEN);
 	job->id[CLUSTER_JOB_ID_LEN] = 0;
-	cluster_job_logf(job, LOG_INFO, "job %s created\n", job->id);
+	strncpy(job->tag, str, CLUSTER_JOB_TAG_LEN);
+	job->tag[CLUSTER_JOB_TAG_LEN] = 0;
+	cluster_job_logf(job, LOG_INFO, "created job %s\n", job->id);
 	return job;
 }
 
@@ -101,7 +103,7 @@ cluster_job_set_parent_id(CLUSTERJOB *job, const char *parentstr)
 {
 	if(!parentstr)
 	{
-		cluster_job_logf(job, LOG_INFO, "job %s no longer has a parent\n", job->id);
+		cluster_job_logf(job, LOG_INFO, "job no longer has a parent\n");
 		job->parent[0] = 0;
 		return 0;
 	}
@@ -112,7 +114,7 @@ cluster_job_set_parent_id(CLUSTERJOB *job, const char *parentstr)
 	}	
 	strncpy(job->parent, parentstr, CLUSTER_JOB_ID_LEN);
 	job->parent[CLUSTER_JOB_ID_LEN] = 0;
-	cluster_job_logf(job, LOG_INFO, "job %s is now a child of %s\n", job->id, parentstr);
+	cluster_job_logf(job, LOG_INFO, "job is now a child of %s\n", parentstr);
 	return 0;
 }
 
@@ -127,6 +129,8 @@ cluster_job_set_id(CLUSTERJOB *job, const char *newid)
 	cluster_job_logf(job, LOG_INFO, "job %s has been given a new ID of %s\n", job->id, newid);
 	strncpy(job->id, newid, CLUSTER_JOB_ID_LEN);
 	job->id[CLUSTER_JOB_ID_LEN] = 0;
+	strncpy(job->tag, newid, CLUSTER_JOB_TAG_LEN);
+	job->tag[CLUSTER_JOB_TAG_LEN] = 0;
 	return 0;
 }
 
@@ -135,7 +139,7 @@ int
 cluster_job_set_total(CLUSTERJOB *job, int total)
 {
 	job->total = total;
-	cluster_job_logf(job, LOG_INFO, "job %s: progress %d/%d\n", job->id, job->progress, job->total);
+	cluster_job_logf(job, LOG_INFO, "job progress %d/%d\n", job->progress, job->total);
 	return 0;
 }
 
@@ -143,7 +147,16 @@ int
 cluster_job_set_progress(CLUSTERJOB *job, int progress)
 {
 	job->progress = progress;
-	cluster_job_logf(job, LOG_INFO, "job %s: progress %d/%d\n", job->id, job->progress, job->total);
+	cluster_job_logf(job, LOG_INFO, "job progress %d/%d\n", job->progress, job->total);
+	return 0;
+}
+
+/* Set the tag used by a job in log messages */
+int
+cluster_job_set_tag(CLUSTERJOB *restrict job, const char *restrict tag)
+{
+	strncpy(job->tag, tag, CLUSTER_JOB_TAG_LEN);
+	job->tag[CLUSTER_JOB_TAG_LEN] = 0;
 	return 0;
 }
 
@@ -151,7 +164,7 @@ cluster_job_set_progress(CLUSTERJOB *job, int progress)
 int
 cluster_job_set(CLUSTERJOB *restrict job, const char *key, const char *value)
 {
-	cluster_job_logf(job, LOG_INFO, "job %s: %s => %s\n", job->id, key, value);
+	cluster_job_logf(job, LOG_DEBUG, "job property %s => %s\n", key, value);
 	return 0;
 }
 
@@ -159,14 +172,24 @@ cluster_job_set(CLUSTERJOB *restrict job, const char *key, const char *value)
 int
 cluster_job_log(CLUSTERJOB *job, int prio, const char *message)
 {
-	cluster_logf_(job->cluster, prio, "%s", message);
+	cluster_logf_(job->cluster, prio, "[%s] %s", job->tag, message);
 	return 0;
 }
 
 int
 cluster_job_vlogf(CLUSTERJOB *job, int prio, const char *format, va_list ap)
 {
-	cluster_vlogf_(job->cluster, prio, format, ap);
+	if(!job->logbuf)
+	{
+		job->logbuf = (char *) calloc(1, CLUSTER_JOB_LOG_LEN + 1);
+		if(!job->logbuf)
+		{
+			cluster_logf_(job->cluster, LOG_CRIT, "failed to allocate buffer for job log messages\n");
+			return -1;
+		}
+	}
+	vsnprintf(job->logbuf, CLUSTER_JOB_LOG_LEN, format, ap);
+	cluster_logf_(job->cluster, prio, "[%s] %s", job->tag, job->logbuf);
 	return 0;
 }
 
@@ -187,28 +210,28 @@ cluster_job_logf(CLUSTERJOB *job, int prio, const char *format, ...)
 int
 cluster_job_wait(CLUSTERJOB *job)
 {
-	cluster_job_logf(job, LOG_INFO, "job %s is now in state WAIT\n", job->id);
+	cluster_job_logf(job, LOG_INFO, "--- job is now in state WAIT ---\n");
 	return 0;
 }
 
 int
 cluster_job_begin(CLUSTERJOB *job)
 {
-	cluster_job_logf(job, LOG_INFO, "job %s is now in state ACTIVE\n", job->id);
+	cluster_job_logf(job, LOG_INFO, "+++ job is now in state ACTIVE +++\n");
 	return 0;
 }
 
 int
 cluster_job_complete(CLUSTERJOB *job)
 {
-	cluster_job_logf(job, LOG_INFO, "job %s is now in state COMPLETE\n", job->id);
+	cluster_job_logf(job, LOG_INFO, "--- job is now in state COMPLETE ---\n");
 	return 0;
 }
 
 int
 cluster_job_fail(CLUSTERJOB *job)
 {
-	cluster_job_logf(job, LOG_INFO, "job %s is now in state FAIL\n", job->id);
+	cluster_job_logf(job, LOG_INFO, "*** job is now in state FAIL ***\n");
 	return 0;
 }
 
