@@ -157,6 +157,9 @@ CLUSTERJOB *cluster_job_create(CLUSTER *cluster);
 /* Create a job object with a specific ID */
 CLUSTERJOB *cluster_job_create_id(CLUSTER *cluster, const char *str);
 
+/* Create a job object with a name and a parent ID */
+CLUSTERJOB *cluster_job_create_name(CLUSTER *cluster, const char *parentid, const char *name);
+
 /* Destroy a job object */
 int cluster_job_destroy(CLUSTERJOB *job);
 
@@ -166,6 +169,9 @@ int cluster_job_set_parent_id(CLUSTERJOB *job, const char *parentstr);
 
 /* Change the ID of a job, if possible */
 int cluster_job_set_id(CLUSTERJOB *job, const char *newid);
+
+/* Change the name of a job, if possible */
+int cluster_job_set_name(CLUSTERJOB *job, const char *newname);
 
 /* Set the total and progress values for a job (not including child job processing) */
 int cluster_job_set_total(CLUSTERJOB *job, int total);

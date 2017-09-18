@@ -62,6 +62,8 @@
 # define CLUSTER_JOB_TAG_LEN            7
 /* Maximum length of a log message */
 # define CLUSTER_JOB_LOG_LEN            511
+/* Maximum length of a job name */
+# define CLUSTER_JOB_NAME_LEN           32
 
 /* We only use syslog for the LOG_xxx constants; if they aren't available
  * we can provide generic values instead.
@@ -165,6 +167,7 @@ struct cluster_job_struct
 	char id[CLUSTER_JOB_ID_LEN+1];
 	char parent[CLUSTER_JOB_ID_LEN+1];
 	char tag[CLUSTER_JOB_TAG_LEN+1];
+	char name[CLUSTER_JOB_NAME_LEN+1];
 	int total;
 	int progress;
 	char *logbuf;

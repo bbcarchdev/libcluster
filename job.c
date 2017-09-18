@@ -79,10 +79,29 @@ cluster_job_create_id(CLUSTER *cluster, const char *str)
 	return job;
 }
 
+/* Create a job object with a name and a parent ID */
+CLUSTERJOB *
+cluster_job_create_name(CLUSTER *cluster, const char *parentid, const char *name)
+{
+	CLUSTERJOB *job;
+	
+	/* XXX For the moment, just stub the lookup operation */
+	(void) name;
+
+	job = cluster_job_create_id(cluster, NULL);
+	if(!job)
+	{
+		return NULL;	   
+	}
+	cluster_job_set_parent_id(job, parentid);
+	return job;
+}
+
 /* Destroy a job object */
 int
 cluster_job_destroy(CLUSTERJOB *job)
 {
+	free(job->logbuf);
 	free(job);
 	return 0;
 }
@@ -138,16 +157,32 @@ cluster_job_set_id(CLUSTERJOB *job, const char *newid)
 int
 cluster_job_set_total(CLUSTERJOB *job, int total)
 {
-	job->total = total;
-	cluster_job_logf(job, LOG_INFO, "job progress %d/%d\n", job->progress, job->total);
+	if(job->total != total)
+	{
+		job->total = total;
+		if(total < job->progress)
+		{
+			job->progress = 0;
+		}
+		cluster_job_logf(job, LOG_INFO, "job progress %d/%d\n", job->progress, job->total);
+	}	
 	return 0;
 }
 
 int
 cluster_job_set_progress(CLUSTERJOB *job, int progress)
 {
-	job->progress = progress;
-	cluster_job_logf(job, LOG_INFO, "job progress %d/%d\n", job->progress, job->total);
+	if(progress > job->total)
+	{
+		job->progress = progress;
+		job->total = progress;
+		cluster_job_logf(job, LOG_INFO, "job progress %d/%d\n", job->progress, job->total);
+	}
+	else if(job->progress != progress)
+	{
+		job->progress = progress;
+		cluster_job_logf(job, LOG_INFO, "job progress %d/%d\n", job->progress, job->total);
+	}
 	return 0;
 }
 
@@ -157,6 +192,22 @@ cluster_job_set_tag(CLUSTERJOB *restrict job, const char *restrict tag)
 {
 	strncpy(job->tag, tag, CLUSTER_JOB_TAG_LEN);
 	job->tag[CLUSTER_JOB_TAG_LEN] = 0;
+	return 0;
+}
+
+/* Set the name of a job - only useful for later retrieval along with a parent UUID */
+int
+cluster_job_set_name(CLUSTERJOB *restrict job, const char *restrict name)
+{
+	if(!job->parent[0])
+	{
+		/* A name is only meaningful within the context of a parent */
+		errno = EPERM;
+		return -1;
+	}
+	strncpy(job->name, name, CLUSTER_JOB_NAME_LEN);
+	job->name[CLUSTER_JOB_NAME_LEN] = 0;
+	cluster_job_logf(job, LOG_INFO, "job name set to '%s'\n");
 	return 0;
 }
 
