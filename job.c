@@ -169,7 +169,7 @@ cluster_job_logf(CLUSTERJOB *job, int prio, const char *format, ...)
 	int r;
 
 	va_start(ap, format);
-	r = cluster_job_logf(job, prio, format, ap);
+	r = cluster_job_vlogf(job, prio, format, ap);
 	va_end(ap);
 
 	return r;
