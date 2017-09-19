@@ -161,7 +161,7 @@ CLUSTERJOB *cluster_job_create_id(CLUSTER *cluster, const char *str);
 CLUSTERJOB *cluster_job_create_id_name(CLUSTER *cluster, const char *parentid, const char *name);
 
 /* Create a job object with a name and a parent job */
-CLUSTERJOB *cluster_job_create_job_name(CLUSTER *cluster, CLUSTERJOB *parent, const char *name);
+CLUSTERJOB *cluster_job_create_job_name(CLUSTERJOB *parent, const char *name);
 
 /* Destroy a job object */
 int cluster_job_destroy(CLUSTERJOB *job);

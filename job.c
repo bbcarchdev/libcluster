@@ -99,9 +99,9 @@ cluster_job_create_id_name(CLUSTER *cluster, const char *parentid, const char *n
 
 /* Create a job object with a name and a parent job */
 CLUSTERJOB *
-cluster_job_create_job_name(CLUSTER *cluster, CLUSTERJOB *parent, const char *name)
+cluster_job_create_job_name(CLUSTERJOB *parent, const char *name)
 {
-	return cluster_job_create_id_name(cluster, parent->id, name);
+	return cluster_job_create_id_name(parent->cluster, parent->id, name);
 }
 
 
@@ -121,6 +121,11 @@ cluster_job_set_parent_job(CLUSTERJOB *job, CLUSTERJOB *parent)
 	if(!parent)
 	{
 		cluster_job_set_parent_id(job, NULL);
+	}
+	if(parent->cluster != parent->cluster)
+	{
+		errno = EINVAL;
+		return -1;
 	}
 	return cluster_job_set_parent_id(job, parent->id);
 }
