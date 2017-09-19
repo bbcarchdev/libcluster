@@ -27,6 +27,7 @@
 # define CLUSTER_SQL_BALANCE_SLEEP      5
 # define CLUSTER_SQL_MAX_BALANCEWAIT    30
 
+static SQL *cluster_sql_connect_(CLUSTER *cluster, const char *purpose);
 static int cluster_sql_rejoin_(CLUSTER *cluster);
 static int cluster_sql_ping_(CLUSTER *cluster);
 static int cluster_sql_perform_ping_(SQL *restrict sql, void *restrict userdata);
@@ -52,18 +53,12 @@ cluster_sql_join_(CLUSTER *cluster)
 {	
 	cluster_wrlock_(cluster);
 	cluster->inst_index = -1;
-	cluster->pingdb = sql_connect(cluster->registry);
-	if(!cluster->pingdb)
+	if(!(cluster->pingdb = cluster_sql_connect_(cluster, "ping")))
 	{
-		cluster_logf_locked_(cluster, LOG_CRIT, "libcluster: SQL: cannot establish ping connection to SQL database <%s>\n", cluster->registry);
 		cluster_unlock_(cluster);
 		cluster_sql_leave_(cluster);
 		return -1;
-	}
-	sql_set_userdata(cluster->pingdb, (void *) cluster);
-	sql_set_noticelog(cluster->pingdb, cluster_sql_noticelog_);
-	sql_set_errorlog(cluster->pingdb, cluster_sql_errorlog_);
-	sql_set_querylog(cluster->pingdb, cluster_sql_querylog_);
+	}  
 	if(sql_migrate(cluster->pingdb, "com.github.bbcarchdev.libcluster", cluster_sql_migrate_, (void *) cluster))
 	{
 		cluster_logf_locked_(cluster, LOG_CRIT, "libcluster: SQL: schema migration failed\n");
@@ -71,18 +66,18 @@ cluster_sql_join_(CLUSTER *cluster)
 		cluster_sql_leave_(cluster);
 		return -1;
 	}
-	cluster->balancedb = sql_connect(cluster->registry);
-	if(!cluster->balancedb)
+	if(!(cluster->balancedb = cluster_sql_connect_(cluster, "balancer")))
 	{
-		cluster_logf_locked_(cluster, LOG_CRIT, "libcluster: SQL: cannot establish balancer connection to SQL database <%s>\n", cluster->registry);
+		cluster_unlock_(cluster);
+		cluster_sql_leave_(cluster);
+		return -1;
+	}  
+	if(!(cluster->jobdb = cluster_sql_connect_(cluster, "jobs")))
+	{
 		cluster_unlock_(cluster);
 		cluster_sql_leave_(cluster);
 		return -1;
 	}
-	sql_set_userdata(cluster->balancedb, (void *) cluster);
-	sql_set_noticelog(cluster->balancedb, cluster_sql_noticelog_);
-	sql_set_errorlog(cluster->balancedb, cluster_sql_errorlog_);
-	sql_set_querylog(cluster->balancedb, cluster_sql_querylog_);
 	if(cluster_sql_ping_(cluster))
 	{
 		cluster_logf_locked_(cluster, LOG_CRIT, "libcluster: SQL: failed to perform initial ping\n");
@@ -152,8 +147,32 @@ cluster_sql_leave_(CLUSTER *cluster)
 		sql_disconnect(cluster->balancedb);
 		cluster->balancedb = NULL;
 	}
+	if(cluster->jobdb)
+	{
+		sql_disconnect(cluster->jobdb);
+		cluster->jobdb = NULL;
+	}
 	cluster_unlock_(cluster);
 	return 0;
+}
+
+/* Actually connect to the SQL database we use as a registry */
+static SQL *
+cluster_sql_connect_(CLUSTER *cluster, const char *purpose)
+{
+	SQL *db;
+
+	db = sql_connect(cluster->registry);
+	if(!db)
+	{
+		cluster_logf_locked_(cluster, LOG_CRIT, "libcluster: SQL: %s: cannot establish connection to SQL database <%s>\n", purpose, cluster->registry);
+		return NULL;
+	}
+	sql_set_userdata(db, (void *) cluster);
+	sql_set_noticelog(db, cluster_sql_noticelog_);
+	sql_set_errorlog(db, cluster_sql_errorlog_);
+	sql_set_querylog(db, cluster_sql_querylog_);
+	return db;
 }
 
 /* "Ping" the registry - this happens once initially, then periodically
@@ -172,6 +191,20 @@ cluster_sql_ping_(CLUSTER *cluster)
 		return 0;
 	}
 	return sql_perform(cluster->pingdb, cluster_sql_perform_ping_, (void *) cluster, 5, SQL_TXN_CONSISTENT);
+}
+
+/* Invoked when a job is created. If a job with the specified ID exists, update
+ * the job object with the information from the database. If it does not exist,
+ * create the new job in the database using the values provided. In either case,
+ * upon a successful return, the job object should match the database (until
+ * another cluster member modifies it).
+ */
+int
+cluster_sql_job_create_(CLUSTERJOB *job)
+{
+	(void) job;
+
+	return 0;
 }
 
 static int

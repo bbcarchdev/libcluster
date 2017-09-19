@@ -154,6 +154,7 @@ struct cluster_struct
 # ifdef ENABLE_SQL
 	SQL *pingdb;
 	SQL *balancedb;
+	SQL *jobdb;
 # endif /*ENABLE_SQL*/
 # ifdef WITH_PTHREAD
 	pthread_t ping_thread;
@@ -214,6 +215,7 @@ int cluster_sql_leave_(CLUSTER *cluster);
 void cluster_sql_prepare_(CLUSTER *cluster);
 void cluster_sql_child_(CLUSTER *cluster);
 void cluster_sql_parent_(CLUSTER *cluster);
+int cluster_sql_job_create_(CLUSTERJOB *job);
 # endif
 
 int cluster_reset_instance_locked_(CLUSTER *cluster);

@@ -62,6 +62,7 @@ cluster_job_create_id(CLUSTER *cluster, const char *str)
 		*s = 0;
 		str = uuidbuf;
 #else
+		errno = EINVAL;
 		return NULL;   
 #endif
 	}
@@ -70,11 +71,20 @@ cluster_job_create_id(CLUSTER *cluster, const char *str)
 	{
 		return NULL;
 	}
-	job->cluster = cluster;
+	job->cluster = cluster;	
 	strncpy(job->id, str, CLUSTER_JOB_ID_LEN);
 	job->id[CLUSTER_JOB_ID_LEN] = 0;
 	strncpy(job->tag, str, CLUSTER_JOB_TAG_LEN);
 	job->tag[CLUSTER_JOB_TAG_LEN] = 0;
+	job->total = 1;
+	if(cluster->type == CT_SQL)
+	{
+		if(cluster_sql_job_create_(job))
+		{
+			cluster_job_destroy(job);
+			return NULL;
+		}
+	}
 	cluster_job_logf(job, LOG_INFO, "created job %s\n", job->id);
 	return job;
 }
@@ -236,7 +246,7 @@ cluster_job_set(CLUSTERJOB *restrict job, const char *key, const char *value)
 int
 cluster_job_log(CLUSTERJOB *job, int prio, const char *message)
 {
-	cluster_logf_(job->cluster, prio, "[%s] %s", job->tag, message);
+	cluster_logf_(job->cluster, prio, "[%s:%d/%d] %s", job->tag, job->progress + 1, job->total, message);
 	return 0;
 }
 
@@ -253,7 +263,7 @@ cluster_job_vlogf(CLUSTERJOB *job, int prio, const char *format, va_list ap)
 		}
 	}
 	vsnprintf(job->logbuf, CLUSTER_JOB_LOG_LEN, format, ap);
-	cluster_logf_(job->cluster, prio, "[%s] %s", job->tag, job->logbuf);
+	cluster_job_log(job, prio, job->logbuf);
 	return 0;
 }
 
